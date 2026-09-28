@@ -26,14 +26,18 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 import com.taller2.negocio.model.Question;
 import com.taller2.negocio.model.QuestionStatus;
+import com.taller2.negocio.model.Usuario;
 import com.taller2.negocio.model.Rol;
-import com.taller2.negocio.service.QuestionService;
+import com.taller2.presentacion.controller.QuestionController;
 
 public class PreguntasView extends JFrame {
-    private final QuestionService service;
+    private final QuestionController controller;
+    private final Usuario usuario;
     private final JComboBox<Question> questions = new JComboBox<>();
     private final JTextField id = new JTextField();
     private final JTextField name = new JTextField();
@@ -58,24 +62,26 @@ public class PreguntasView extends JFrame {
     private final int pageSize = 10;
     private final JTextField searchFilter = new JTextField(15);
     private final JLabel pageLabel = new JLabel("Pág 1");
-    private final Rol rol;
     private final StatisticsView statisticsView;
     private final PieChartView pieChartView;
 
-    public PreguntasView(QuestionService service, Rol rol) {
-        this.service = service;
-        this.rol = rol;
-        statisticsView = new StatisticsView(service);
-        pieChartView = new PieChartView(service);
+    public PreguntasView(QuestionController controller, Usuario usuario) {
+        this.controller = controller;
+        this.usuario = usuario;
+        statisticsView = new StatisticsView(controller, usuario);
+        pieChartView = new PieChartView(controller, usuario);
         initComponents();
         configurarRenderizadorEstados();
         cargarPreguntas();
     }
 
     private void initComponents() {
-        setTitle("Banco de preguntas Saber Pro - DCE");
+        setTitle(usuario.getRol() == Rol.AUTOR_PREGUNTAS
+            ? "Mis preguntas Saber Pro - DCE"
+            : "Banco de preguntas Saber Pro - DCE");
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         questions.addActionListener(e -> cargarPreguntaSeleccionada());
+        vincularOpcionesCorrectas(options, correctOption);
         id.setEditable(false);
 
         // Panel superior: Filtros y selección
@@ -122,7 +128,7 @@ public class PreguntasView extends JFrame {
         agregarCampo(form, "Bibliografía:", bibliography, row++);
         agregarCampo(form, "Estado:", status, row++);
 
-        if (rol == Rol.ADMINISTRADOR) {
+        if (controller.puedeAsignarRevisor(usuario)) {
             agregarCampo(form, "Email Revisor Asignado:", reviewerEmail, row++);
         }
 
@@ -134,7 +140,7 @@ public class PreguntasView extends JFrame {
         updateState.addActionListener(e -> actualizarEstado());
 
         JPanel buttons = new JPanel();
-        if (rol == Rol.ADMINISTRADOR) {
+        if (controller.puedeAsignarRevisor(usuario)) {
             JButton assignReviewer = new JButton("Asignar Revisor");
             assignReviewer.addActionListener(e -> asignarRevisor());
             buttons.add(assignReviewer);
@@ -158,7 +164,7 @@ public class PreguntasView extends JFrame {
         });
         JButton next = new JButton("Siguiente >");
         next.addActionListener(e -> { 
-            int totalResultados = service.contarPorFiltro(searchFilter.getText());
+            int totalResultados = controller.contarPorFiltro(usuario, searchFilter.getText());
             int totalPaginas = (int) Math.ceil((double) totalResultados / pageSize);
             if (currentPage + 1 < totalPaginas) {
                 currentPage++; 
@@ -197,7 +203,7 @@ public class PreguntasView extends JFrame {
                 else if (value == QuestionStatus.APROBADA) setForeground(Color.GREEN);
                 else if (value == QuestionStatus.EN_REVISION) setForeground(Color.BLUE);
                 else if (value == QuestionStatus.PUBLICADA) setForeground(new Color(0, 128, 128));
-                else if (value == QuestionStatus.ARVHIVADA) setForeground(new Color(128, 0, 128));
+                else if (value == QuestionStatus.ARCHIVADA) setForeground(new Color(128, 0, 128));
                 else setForeground(Color.BLACK);
                 
                 if (isSelected) setForeground(Color.WHITE);
@@ -223,10 +229,39 @@ public class PreguntasView extends JFrame {
         }
     }
 
+    static void vincularOpcionesCorrectas(JTextField options, JComboBox<Integer> correctOption) {
+        DocumentListener listener = new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent event) {
+                actualizarDesdeTexto();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent event) {
+                actualizarDesdeTexto();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent event) {
+                actualizarDesdeTexto();
+            }
+
+            private void actualizarDesdeTexto() {
+                long count = Arrays.stream(options.getText().split("\\|", -1))
+                        .filter(option -> !option.isBlank())
+                        .count();
+                actualizarOpcionesCorrectas(correctOption, (int) count,
+                        correctOption.getSelectedIndex());
+            }
+        };
+        options.getDocument().addDocumentListener(listener);
+        listener.insertUpdate(null);
+    }
+
     private void cargarPreguntas() {
         String filtro = searchFilter.getText().trim();
-        List<Question> paginadas = service.listarPaginado(filtro, currentPage, pageSize);
-        int totalResultados = service.contarPorFiltro(filtro);
+        List<Question> paginadas = controller.listarPaginado(usuario, filtro, currentPage, pageSize);
+        int totalResultados = controller.contarPorFiltro(usuario, filtro);
         int totalPaginas = (int) Math.ceil((double) totalResultados / pageSize);
         if (totalPaginas == 0) totalPaginas = 1;
 
@@ -282,9 +317,19 @@ public class PreguntasView extends JFrame {
     }
 
     private void actualizarOpcionesCorrectas(int size, int selected) {
+        actualizarOpcionesCorrectas(correctOption, size, selected);
+    }
+
+    private static void actualizarOpcionesCorrectas(JComboBox<Integer> correctOption,
+            int size, int selected) {
+        int previousSelection = selected;
         correctOption.removeAllItems();
-        for (int i = 0; i < size; i++) correctOption.addItem(i);
-        if (size > 0) correctOption.setSelectedItem(Math.min(selected, size - 1));
+        for (int i = 0; i < size; i++) {
+            correctOption.addItem(i);
+        }
+        if (size > 0) {
+            correctOption.setSelectedIndex(Math.min(Math.max(previousSelection, 0), size - 1));
+        }
     }
 
     private List<String> leerOpciones() {
@@ -294,16 +339,6 @@ public class PreguntasView extends JFrame {
     private void guardar() {
         try {
             List<String> questionOptions = leerOpciones();
-            
-            if (questionOptions.size() != 4) {
-                throw new IllegalArgumentException("Debe ingresar exactamente 4 distractores separados por |");
-            }
-            if (context.getText().isBlank() || text.getText().isBlank() || justification.getText().isBlank()) {
-                throw new IllegalArgumentException("Contexto, Pregunta y Justificación son obligatorios.");
-            }
-            if (competency.getText().isBlank() || topic.getText().isBlank()) {
-                throw new IllegalArgumentException("Debe definir Competencia y Tema.");
-            }
 
             int selectedOption = correctOption.getSelectedItem() instanceof Integer
                     ? (Integer) correctOption.getSelectedItem() : 0;
@@ -327,9 +362,9 @@ public class PreguntasView extends JFrame {
 
             if (!id.getText().isBlank()) {
                 nueva.setId(Integer.parseInt(id.getText()));
-                service.actualizar(nueva);
+                controller.actualizar(usuario, nueva);
             } else {
-                service.guardar(nueva);
+                controller.guardar(usuario, nueva);
             }
             
             cargarPreguntas();
@@ -345,27 +380,27 @@ public class PreguntasView extends JFrame {
         if (question == null) return;
        
         QuestionStatus nuevoEstado = (QuestionStatus) status.getSelectedItem();
-        service.cambiarEstado(question, nuevoEstado);
-        cargarPreguntas();
-        JOptionPane.showMessageDialog(this, "Estado actualizado exitosamente.");
+        try {
+            controller.cambiarEstado(usuario, question, nuevoEstado);
+            cargarPreguntas();
+            JOptionPane.showMessageDialog(this, "Estado actualizado exitosamente.");
+        } catch (IllegalArgumentException exception) {
+            JOptionPane.showMessageDialog(this, exception.getMessage(), "No se pudo actualizar",
+                    JOptionPane.WARNING_MESSAGE);
+        }
     }
 
     private void asignarRevisor() {
         Question question = (Question) questions.getSelectedItem();
         if (question == null) return;
         
-        if (question.getEstado() != QuestionStatus.PENDIENTE_REVISION) {
-            JOptionPane.showMessageDialog(this, "La pregunta debe estar en 'Pendiente de revisión' para asignar un revisor.");
-            return;
-        }
-        
         String email = reviewerEmail.getText().trim();
-        if (email.isBlank() || !email.contains("@")) {
-            JOptionPane.showMessageDialog(this, "Ingrese un email válido del revisor.");
-            return;
+        try {
+            controller.asignarRevisor(usuario, question, email);
+            JOptionPane.showMessageDialog(this, "Revisor asignado. Email de notificación enviado a: " + email);
+        } catch (IllegalArgumentException exception) {
+            JOptionPane.showMessageDialog(this, exception.getMessage(), "No se pudo asignar el revisor",
+                    JOptionPane.WARNING_MESSAGE);
         }
-
-        service.asignarRevisorYNotificar(question, email);
-        JOptionPane.showMessageDialog(this, "Revisor asignado. Email de notificación enviado a: " + email);
     }
 }

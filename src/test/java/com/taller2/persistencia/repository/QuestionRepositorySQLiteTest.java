@@ -42,7 +42,8 @@ class QuestionRepositorySQLiteTest {
                         tema TEXT,
                         subtema TEXT,
                         nivel_dificultad TEXT,
-                        revisor_asignado TEXT
+                        revisor_asignado TEXT,
+                        autor_id INTEGER
                     )
                     """);
         }
@@ -75,6 +76,31 @@ class QuestionRepositorySQLiteTest {
         assertEquals("Texto de contexto de prueba", question.getContexto());
         assertEquals("Matemáticas", question.getTema());
         assertEquals("Razonamiento Cuantitativo", question.getCompetencia());
+    }
+
+    @Test
+    void debeFiltrarPreguntasPorAutor() {
+        Question first = crearPregunta("Pregunta de autor 1");
+        first.setAutorId(7);
+        Question second = crearPregunta("Pregunta de autor 2");
+        second.setAutorId(8);
+
+        repository.guardar(first);
+        repository.guardar(second);
+
+        List<Question> ownQuestions = repository.listarPorAutor(7);
+
+        assertEquals(1, ownQuestions.size());
+        assertEquals(7, ownQuestions.get(0).getAutorId());
+        assertEquals("Pregunta de autor 1", ownQuestions.get(0).getNombre());
+    }
+
+    private Question crearPregunta(String name) {
+        return new Question(
+                name, "¿Cuál es la opción correcta?", List.of("A", "B", "C", "D"),
+                1, QuestionStatus.BORRADOR, "Contexto", "Justificación", "Bibliografía",
+                "Competencia", "Tema", "Subtema", "Medio", null
+        );
     }
 
     @Test

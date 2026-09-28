@@ -18,12 +18,11 @@ import javax.swing.JTextField;
 import com.taller2.negocio.model.EstadoUsuario;
 import com.taller2.negocio.model.Rol;
 import com.taller2.negocio.model.Usuario;
-import com.taller2.negocio.service.UsuarioService;
 import com.taller2.presentacion.controller.UsuarioController;
 
 public class RegistroView extends JFrame {
-    private final UsuarioService usuarioService;
     private final UsuarioController usuarioController;
+    private final Runnable volverAlLogin;
     private final JTextField login = new JTextField(18);
     private final JTextField nombre = new JTextField(18);
     private final JComboBox<Rol> rol = new JComboBox<>(Rol.values());
@@ -31,13 +30,9 @@ public class RegistroView extends JFrame {
     private final JPasswordField password = new JPasswordField(18);
     private final JPasswordField confirmacion = new JPasswordField(18);
 
-    public RegistroView(UsuarioService usuarioService) {
-        this(new UsuarioController(usuarioService));
-    }
-
-    public RegistroView(UsuarioController usuarioController) {
+    public RegistroView(UsuarioController usuarioController, Runnable volverAlLogin) {
         this.usuarioController = usuarioController;
-        this.usuarioService = usuarioController.getUsuarioService();
+        this.volverAlLogin = volverAlLogin;
         estado.setSelectedItem(EstadoUsuario.ACTIVO);
         initComponents();
     }
@@ -60,7 +55,7 @@ public class RegistroView extends JFrame {
         registrar.addActionListener(e -> registrar());
         JButton volver = new JButton("Volver");
         volver.addActionListener(e -> {
-            new LoginView(usuarioService).setVisible(true);
+            volverAlLogin.run();
             dispose();
         });
         GridBagConstraints c = constraint(0, labels.length);
@@ -100,7 +95,7 @@ public class RegistroView extends JFrame {
                 passwordValue,
                 () -> {
                     JOptionPane.showMessageDialog(this, "Usuario registrado correctamente.");
-                    new LoginView(usuarioService).setVisible(true);
+                    volverAlLogin.run();
                     dispose();
                 },
                 error -> JOptionPane.showMessageDialog(this, error,

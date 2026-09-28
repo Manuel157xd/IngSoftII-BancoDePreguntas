@@ -20,7 +20,7 @@ public class QuestionRepositorySQLite implements QuestionRepository {
     private static final String SELECT_ALL_COLUMNS = 
         "SELECT id, nombre, texto, opciones, respuesta_correcta, estado, " +
         "contexto, justificacion, bibliografia, competencia, tema, subtema, " +
-        "nivel_dificultad, revisor_asignado FROM preguntas";
+        "nivel_dificultad, revisor_asignado, autor_id FROM preguntas";
 
     public QuestionRepositorySQLite() {
         this(new SQLiteConnectionProvider());
@@ -39,8 +39,9 @@ public class QuestionRepositorySQLite implements QuestionRepository {
         String sql = """
                 INSERT INTO preguntas
                 (nombre, texto, opciones, respuesta_correcta, estado,
-                 contexto, justificacion, bibliografia, competencia, tema, subtema, nivel_dificultad, revisor_asignado)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 contexto, justificacion, bibliografia, competencia, tema, subtema,
+                 nivel_dificultad, revisor_asignado, autor_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (Connection connection = connectionProvider.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -57,6 +58,7 @@ public class QuestionRepositorySQLite implements QuestionRepository {
             statement.setString(11, question.getSubtema());
             statement.setString(12, question.getNivelDificultad());
             statement.setString(13, question.getRevisorAsignado());
+            statement.setObject(14, question.getAutorId());
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Error al guardar pregunta.", e);
@@ -85,6 +87,11 @@ public class QuestionRepositorySQLite implements QuestionRepository {
     }
 
     @Override
+    public List<Question> listarPorAutor(int autorId) {
+        return listar(SELECT_ALL_COLUMNS + " WHERE autor_id = ?", autorId);
+    }
+
+    @Override
     public List<Question> listarPorEstado(QuestionStatus estado) {
         String sql = SELECT_ALL_COLUMNS + " WHERE estado = ?";
         try (Connection connection = connectionProvider.getConnection();
@@ -108,7 +115,7 @@ public class QuestionRepositorySQLite implements QuestionRepository {
                 UPDATE preguntas SET nombre = ?, texto = ?, opciones = ?,
                 respuesta_correcta = ?, estado = ?, contexto = ?, justificacion = ?,
                 bibliografia = ?, competencia = ?, tema = ?, subtema = ?,
-                nivel_dificultad = ?, revisor_asignado = ? WHERE id = ?
+                nivel_dificultad = ?, revisor_asignado = ?, autor_id = ? WHERE id = ?
                 """;
         try (Connection connection = connectionProvider.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -125,7 +132,8 @@ public class QuestionRepositorySQLite implements QuestionRepository {
             statement.setString(11, question.getSubtema());
             statement.setString(12, question.getNivelDificultad());
             statement.setString(13, question.getRevisorAsignado());
-            statement.setInt(14, question.getId());
+            statement.setObject(14, question.getAutorId());
+            statement.setInt(15, question.getId());
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Error al actualizar pregunta.", e);
@@ -158,8 +166,24 @@ public class QuestionRepositorySQLite implements QuestionRepository {
         }
     }
 
+    private List<Question> listar(String sql, int autorId) {
+        try (Connection connection = connectionProvider.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, autorId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<Question> questions = new ArrayList<>();
+                while (resultSet.next()) {
+                    questions.add(mapear(resultSet));
+                }
+                return questions;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error al listar preguntas del autor.", e);
+        }
+    }
+
     private Question mapear(ResultSet resultSet) throws SQLException {
-        return new Question(
+        Question question = new Question(
                 resultSet.getInt("id"),
                 resultSet.getString("nombre"),
                 resultSet.getString("texto"),
@@ -175,6 +199,9 @@ public class QuestionRepositorySQLite implements QuestionRepository {
                 resultSet.getString("nivel_dificultad"),
                 resultSet.getString("revisor_asignado")
         );
+            int autorId = resultSet.getInt("autor_id");
+            question.setAutorId(resultSet.wasNull() ? null : autorId);
+            return question;
     }
 
     private String serializarOpciones(List<String> opciones) {

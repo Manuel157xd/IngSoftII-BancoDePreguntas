@@ -10,6 +10,8 @@ import com.taller2.negocio.service.QuestionService;
 import com.taller2.negocio.service.UsuarioService;
 import com.taller2.presentacion.swing.LoginView;
 import com.taller2.negocio.validation.PasswordValidator;
+import com.taller2.negocio.validation.QuestionValidator;
+import com.taller2.presentacion.controller.QuestionController;
 
 public class Main {
     public static void main(String[] args) {
@@ -24,10 +26,14 @@ public class Main {
                 passwordValidator,
                 passwordHasher
         );
-        QuestionService questionService = new QuestionService(new QuestionRepositorySQLite());
+        QuestionService questionService = new QuestionService(
+            new QuestionRepositorySQLite(),
+            new QuestionValidator()
+        );
+        QuestionController questionController = new QuestionController(questionService);
 
         SwingUtilities.invokeLater(() -> {
-            LoginView loginView = new LoginView(usuarioService, questionService);
+            LoginView loginView = new LoginView(usuarioService, questionController);
             loginView.setVisible(true);
         });
     }

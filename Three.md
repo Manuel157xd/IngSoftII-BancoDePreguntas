@@ -1,124 +1,70 @@
-# File Tree: ProyectoIngSoft2
+# Estructura actual del proyecto
 
-**Generated:** 9/15/2026, 5:13:31 PM
-**Root Path:** `d:\universidad\6_Semestre\Lab_Ing_Software_2\ProyectoIngSoft2`
+La aplicación es un monolito Java Desktop. Los paquetes de producción y pruebas siguen el mismo espacio de nombres `com.taller2`.
 
-```
-├── plugins
-│   ├── generadorMultimedia
-│   │   ├── src
-│   │   │   └── main
-│   │   │       └── java
-│   │   │           └── com
-│   │   │               └── taller2
-│   │   │                   └── plugins
-│   │   │                       └── GeneradorPreguntaMultimedia.java
-│   │   └── pom.xml
-│   ├── generadorMultiple
-│   │   ├── src
-│   │   │   └── main
-│   │   │       └── java
-│   │   │           └── com
-│   │   │               └── taller2
-│   │   │                   └── plugins
-│   │   │                       └── GeneradorPreguntasSeleccionMultiple.java
-│   │   └── pom.xml
-│   └── importadorExcel
-│       ├── src
-│       │   └── main
-│       │       └── java
-│       │           └── com
-│       │               └── taller2
-│       │                   └── plugins
-│       │                       └── ImportadorPreguntasExcel.java
-│       └── pom.xml
-├── src
-│   ├── main
-│   │   ├── java
-│   │   │   ├── com
-│   │   │   │   └── taller2
-│   │   │   │       └── Main.java
-│   │   │   ├── core
-│   │   │   │   ├── contracts
-│   │   │   │   │   ├── Filter.java
-│   │   │   │   │   ├── Pipeline.java
-│   │   │   │   │   ├── Plugin.java
-│   │   │   │   │   └── PluginContext.java
-│   │   │   │   ├── model
-│   │   │   │   │   ├── Competencia.java
-│   │   │   │   │   ├── NivelDificultad.java
-│   │   │   │   │   ├── PreguntaNueva.java
-│   │   │   │   │   └── ResultadoPipeline.java
-│   │   │   │   ├── BancoPreguntas.java
-│   │   │   │   ├── DefaultPluginContext.java
-│   │   │   │   ├── Kernel.java
-│   │   │   │   ├── LifecycleManager.java
-│   │   │   │   ├── PluginLoader.java
-│   │   │   │   └── PluginRegistry.java
-│   │   │   ├── database
-│   │   │   │   ├── DatabaseConnection.java
-│   │   │   │   └── DatabaseInitializer.java
-│   │   │   ├── model
+```text
+src/
+├── main/
+│   ├── java/com/taller2/
+│   │   ├── Main.java
+│   │   ├── negocio/
+│   │   │   ├── model/
 │   │   │   │   ├── EstadoUsuario.java
 │   │   │   │   ├── Question.java
 │   │   │   │   ├── QuestionStatus.java
 │   │   │   │   ├── Rol.java
 │   │   │   │   └── Usuario.java
-│   │   │   ├── pipeline
-│   │   │   │   ├── filters
-│   │   │   │   │   ├── ClassificationFilter.java
-│   │   │   │   │   ├── ContentValidationFilter.java
-│   │   │   │   │   ├── CorrectAnswerValidatorFilter.java
-│   │   │   │   │   └── OptionsValidatorFilter.java
-│   │   │   │   ├── PipelineContext.java
-│   │   │   │   └── PipelineImpl.java
-│   │   │   ├── repository
-│   │   │   │   ├── QuestionRepository.java
-│   │   │   │   ├── QuestionRepositorySQLite.java
-│   │   │   │   ├── UsuarioRepository.java
-│   │   │   │   └── UsuarioRepositorySQLite.java
-│   │   │   ├── security
-│   │   │   │   ├── Argon2PasswordHasher.java
-│   │   │   │   └── PasswordHasher.java
-│   │   │   ├── service
+│   │   │   ├── service/
 │   │   │   │   ├── QuestionService.java
 │   │   │   │   └── UsuarioService.java
-│   │   │   ├── ui
-│   │   │   │   └── swing
+│   │   │   └── validation/
+│   │   │       ├── PasswordPolicy.java
+│   │   │       ├── PasswordValidator.java
+│   │   │       ├── QuestionPolicy.java
+│   │   │       └── QuestionValidator.java
+│   │   ├── persistencia/
+│   │   │   ├── database/
+│   │   │   │   ├── ConnectionProvider.java
+│   │   │   │   ├── DatabaseConnection.java
+│   │   │   │   ├── DatabaseInitializer.java
+│   │   │   │   └── SQLiteConnectionProvider.java
+│   │   │   └── repository/
+│   │   │   │       ├── QuestionRepository.java
+│   │   │   │       ├── QuestionRepositorySQLite.java
+│   │   │   │       ├── UsuarioRepository.java
+│   │   │   │       └── UsuarioRepositorySQLite.java
+│   │   ├── presentacion/
+│   │   │   ├── controller/
+│   │   │   │   ├── QuestionController.java
+│   │   │   │   └── UsuarioController.java
+│   │   │   └── swing/
 │   │   │   │       ├── DashboardView.java
 │   │   │   │       ├── EditarUsuarioView.java
 │   │   │   │       ├── GestionUsuariosView.java
 │   │   │   │       ├── ListaUsuariosView.java
 │   │   │   │       ├── LoginView.java
 │   │   │   │       ├── PieChartView.java
-│   │   │   │       ├── PluginExecutionView.java
 │   │   │   │       ├── PreguntasView.java
 │   │   │   │       ├── RegistroView.java
 │   │   │   │       └── StatisticsView.java
-│   │   │   └── validation
-│   │   │       └── PasswordValidator.java
-│   │   └── resources
-│   │       ├── fxml
-│   │       └── plugins.properties
-│   ├── plugins
-│   │   ├── generadorMultimedia
-│   │   ├── generadorMultiple
-│   │   └── importadorExcel
-│   └── test
-│       └── java
-│           ├── repository
-│           │   ├── QuestionRepositorySQLiteTest.java
-│           │   └── UsuarioRepositorySQLiteTest.java
-│           ├── service
-│           │   ├── QuestionServiceTest.java
-│           │   └── UsuarioServiceTest.java
-│           └── validation
-│               └── PasswordValidatorTest.java
-├── .gitignore
-├── Three.md
-├── plugins.properties
-└── pom.xml
+│   │   └── seguridad/
+│   │       ├── Argon2PasswordHasher.java
+│   │       └── PasswordHasher.java
+│   └── resources/  (vacío; ubicación estándar de recursos Maven)
+└── test/java/com/taller2/
+    ├── negocio/
+    │   ├── service/
+    │   │   ├── QuestionServiceTest.java
+    │   │   └── UsuarioServiceTest.java
+    │   └── validation/
+    │       ├── PasswordValidatorTest.java
+    │       └── QuestionValidatorTest.java
+    ├── persistencia/database/DatabaseInitializerTest.java
+    ├── persistencia/repository/
+    │   ├── QuestionRepositorySQLiteTest.java
+    │   └── UsuarioRepositorySQLiteTest.java
+    ├── presentacion/controller/QuestionControllerTest.java
+    └── presentacion/swing/PreguntasViewTest.java
 ```
 
----
-*Generated by FileTree Pro Extension*
+Las vistas Swing pertenecen a `presentacion.swing`; los controladores de interfaz, a `presentacion.controller`. Los servicios y modelos forman parte de la capa de negocio, y los repositorios y conexiones de la capa de persistencia. `QuestionValidator` concentra las reglas del formulario fuera de Swing; la migración agrega `autor_id` sin descartar preguntas anteriores.

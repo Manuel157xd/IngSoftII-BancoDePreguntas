@@ -8,23 +8,19 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import com.taller2.negocio.model.Usuario;
-import com.taller2.negocio.service.QuestionService;
 import com.taller2.negocio.service.UsuarioService;
+import com.taller2.presentacion.controller.QuestionController;
 
 public class DashboardView extends JFrame {
     private final Usuario usuario;
     private final UsuarioService usuarioService;
-    private final QuestionService questionService;
-
-    public DashboardView(Usuario usuario, UsuarioService usuarioService) {
-        this(usuario, usuarioService, new QuestionService(new com.taller2.persistencia.repository.QuestionRepositorySQLite()));
-    }
+    private final QuestionController questionController;
 
     public DashboardView(Usuario usuario, UsuarioService usuarioService,
-                         QuestionService questionService) {
+                         QuestionController questionController) {
         this.usuario = usuario;
         this.usuarioService = usuarioService;
-        this.questionService = questionService;
+        this.questionController = questionController;
         initComponents();
     }
 
@@ -36,7 +32,7 @@ public class DashboardView extends JFrame {
         panel.add(new JLabel("Rol: " + usuario.getRol()));
 
         JButton preguntas = new JButton("Banco de preguntas");
-        preguntas.addActionListener(e -> new PreguntasView(questionService, usuario.getRol()).setVisible(true));
+        preguntas.addActionListener(e -> new PreguntasView(questionController, usuario).setVisible(true));
         panel.add(preguntas);
 /* 
         if (kernel != null) {
@@ -53,7 +49,7 @@ public class DashboardView extends JFrame {
 
         JButton cerrar = new JButton("Cerrar sesión");
         cerrar.addActionListener(e -> {
-            new LoginView(usuarioService, questionService).setVisible(true);
+            new LoginView(usuarioService, questionController).setVisible(true);
             dispose();
         });
         panel.add(cerrar);

@@ -18,6 +18,7 @@ public class Question {
     private String subtema;
     private String nivelDificultad;
     private String revisorAsignado;
+    private Integer autorId;
 
     public Question(String nombre, String texto, List<String> opciones,
                     int respuestaCorrecta, QuestionStatus estado,
@@ -65,6 +66,7 @@ public class Question {
     public String getSubtema() { return subtema; }
     public String getNivelDificultad() { return nivelDificultad; }
     public String getRevisorAsignado() { return revisorAsignado; }
+    public Integer getAutorId() { return autorId; }
 
     public void setId(int id) { this.id = id; }
     public void setNombre(String nombre) { this.nombre = nombre; }
@@ -81,6 +83,7 @@ public class Question {
     public void setSubtema(String subtema) { this.subtema = subtema; }
     public void setNivelDificultad(String nivelDificultad) { this.nivelDificultad = nivelDificultad; }
     public void setRevisorAsignado(String revisorAsignado) { this.revisorAsignado = revisorAsignado; }
+    public void setAutorId(Integer autorId) { this.autorId = autorId; }
 
     @Override
     public String toString() {

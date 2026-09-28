@@ -7,6 +7,6 @@ public enum QuestionStatus {
     APROBADA,
     RECHAZADA,
     PUBLICADA,
-    ARVHIVADA,
+    ARCHIVADA
 
 }

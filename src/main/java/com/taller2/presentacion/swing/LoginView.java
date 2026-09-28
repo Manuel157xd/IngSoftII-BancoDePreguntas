@@ -1,8 +1,7 @@
 package com.taller2.presentacion.swing;
 
-import com.taller2.persistencia.repository.QuestionRepositorySQLite;
-import com.taller2.negocio.service.QuestionService;
 import com.taller2.negocio.service.UsuarioService;
+import com.taller2.presentacion.controller.QuestionController;
 import com.taller2.presentacion.controller.UsuarioController;
 
 import javax.swing.BorderFactory;
@@ -20,22 +19,18 @@ import java.awt.Insets;
 public class LoginView extends JFrame {
     private final UsuarioService usuarioService;
     private final UsuarioController usuarioController;
-    private final QuestionService questionService;
+    private final QuestionController questionController;
     private final JTextField loginField = new JTextField(20);
     private final JPasswordField passwordField = new JPasswordField(20);
 
-    public LoginView(UsuarioService usuarioService) {
-        this(usuarioService, new QuestionService(new QuestionRepositorySQLite()));
+    public LoginView(UsuarioService usuarioService, QuestionController questionController) {
+        this(new UsuarioController(usuarioService), questionController);
     }
 
-    public LoginView(UsuarioService usuarioService, QuestionService questionService) {
-        this(new UsuarioController(usuarioService), questionService);
-    }
-
-    public LoginView(UsuarioController usuarioController, QuestionService questionService) {
+    public LoginView(UsuarioController usuarioController, QuestionController questionController) {
         this.usuarioController = usuarioController;
         this.usuarioService = usuarioController.getUsuarioService();
-        this.questionService = questionService;
+        this.questionController = questionController;
         initComponents();
     }
 
@@ -70,7 +65,8 @@ public class LoginView extends JFrame {
         loginButton.addActionListener(e -> iniciarSesion());
         JButton registerButton = new JButton("Registrarse");
         registerButton.addActionListener(e -> {
-            new RegistroView(usuarioService).setVisible(true);
+            new RegistroView(usuarioController,
+                    () -> new LoginView(usuarioController, questionController).setVisible(true)).setVisible(true);
             dispose();
         });
         c.gridx = 0; c.gridy++;
@@ -86,7 +82,7 @@ public class LoginView extends JFrame {
 
         usuarioController.iniciarSesion(login, password,
                 usuario -> {
-                    new DashboardView(usuario, usuarioService, questionService).setVisible(true);
+                    new DashboardView(usuario, usuarioService, questionController).setVisible(true);
                     dispose();
                 },
                 error -> JOptionPane.showMessageDialog(this, error,

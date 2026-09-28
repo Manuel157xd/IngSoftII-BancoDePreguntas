@@ -10,6 +10,7 @@ public interface QuestionRepository {
     void guardar(Question question);
     Optional<Question> buscarPorId(int id);
     List<Question> listarTodas();
+    List<Question> listarPorAutor(int autorId);
     void actualizar(Question question);
     void eliminar(int id);
     List<Question> listarPorEstado(QuestionStatus estado);

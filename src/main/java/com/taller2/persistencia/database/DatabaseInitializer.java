@@ -35,7 +35,8 @@ public class DatabaseInitializer {
                         tema TEXT,
                         subtema TEXT,
                         nivel_dificultad TEXT,
-                        revisor_asignado TEXT
+                        revisor_asignado TEXT,
+                        autor_id INTEGER REFERENCES usuarios(id)
                 )
                 """;
 
@@ -46,6 +47,8 @@ public class DatabaseInitializer {
 
             statement.execute(usuariosSql);
             statement.execute(preguntasSql);
+            ensureQuestionAuthorColumn(connection);
+            migrateArchivedQuestionStatus(connection);
 
             System.out.println("Base de datos inicializada correctamente.");
 
@@ -55,6 +58,34 @@ public class DatabaseInitializer {
                     "Error al inicializar la base de datos: "
                             + e.getMessage()
             );
+        }
+    }
+
+    static void ensureQuestionAuthorColumn(Connection connection) throws SQLException {
+        boolean authorColumnExists = false;
+        try (Statement statement = connection.createStatement();
+             java.sql.ResultSet columns = statement.executeQuery("PRAGMA table_info(preguntas)")) {
+            while (columns.next()) {
+                if ("autor_id".equalsIgnoreCase(columns.getString("name"))) {
+                    authorColumnExists = true;
+                    break;
+                }
+            }
+        }
+        if (!authorColumnExists) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("ALTER TABLE preguntas ADD COLUMN autor_id INTEGER REFERENCES usuarios(id)");
+            }
+        }
+    }
+
+    static void migrateArchivedQuestionStatus(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    UPDATE preguntas
+                    SET estado = 'ARCHIVADA'
+                    WHERE UPPER(estado) = 'ARVHIVADA'
+                    """);
         }
     }
 }
