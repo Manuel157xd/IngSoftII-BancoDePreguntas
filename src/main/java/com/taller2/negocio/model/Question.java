@@ -85,6 +85,18 @@ public class Question {
     public void setRevisorAsignado(String revisorAsignado) { this.revisorAsignado = revisorAsignado; }
     public void setAutorId(Integer autorId) { this.autorId = autorId; }
 
+    public com.taller2.negocio.model.state.QuestionState getStateObject() {
+        return com.taller2.negocio.model.state.QuestionStateFactory.getState(this.estado);
+    }
+
+    public String getColorHex() {
+        return getStateObject().getColorHex();
+    }
+
+    public static com.taller2.negocio.model.builder.QuestionBuilder builder() {
+        return com.taller2.negocio.model.builder.QuestionBuilder.builder();
+    }
+
     @Override
     public String toString() {
         return id + " - " + nombre;
