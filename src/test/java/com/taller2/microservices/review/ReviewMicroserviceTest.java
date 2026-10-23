@@ -2,6 +2,7 @@ package com.taller2.microservices.review;
 
 import com.taller2.microservices.events.DomainEventBus;
 import com.taller2.microservices.questions.repository.QuestionMicroserviceRepository;
+import com.taller2.microservices.questionclient.LocalQuestionServiceClient;
 import com.taller2.microservices.review.controller.ReviewRestController;
 import com.taller2.microservices.review.repository.ReviewMicroserviceRepository;
 import com.taller2.negocio.model.Question;
@@ -30,7 +31,9 @@ class ReviewMicroserviceTest {
         reviewRepo = new ReviewMicroserviceRepository("jdbc:sqlite:test_reviews.db");
         questionRepo = new QuestionMicroserviceRepository("jdbc:sqlite:test_questions.db");
         eventBus = new DomainEventBus();
-        controller = new ReviewRestController(reviewRepo, questionRepo, eventBus);
+        controller = new ReviewRestController(
+                reviewRepo, new LocalQuestionServiceClient(questionRepo), eventBus
+        );
     }
 
     @Test
@@ -90,6 +93,7 @@ class ReviewMicroserviceTest {
                 .conEstado(QuestionStatus.EN_REVISION)
                 .build();
         Question guardada = questionRepo.save(q);
+        reviewRepo.createAssignment(guardada.getId(), "revisor1@unicauca.edu.co");
 
         ResponseEntity<?> resp = controller.evaluateQuestion(
                 new ReviewRestController.EvaluateQuestionDTO(guardada.getId(), "revisor1@unicauca.edu.co", "APROBADA", "Excelente redacción.")
@@ -100,5 +104,31 @@ class ReviewMicroserviceTest {
         Question evaluada = questionRepo.findById(guardada.getId()).orElseThrow();
         assertEquals(QuestionStatus.APROBADA, evaluada.getEstado());
         assertEquals("#28A745", evaluada.getColorHex());
+    }
+
+    @Test
+    void testRevisorSinAsignacionNoPuedeEvaluar() {
+        Question q = Question.builder()
+                .conNombre("Pregunta protegida")
+                .conTexto("Texto")
+                .conContexto("Contexto")
+                .conOpciones(List.of("A", "B", "C", "D"))
+                .conRespuestaCorrecta(0)
+                .conEstado(QuestionStatus.EN_REVISION)
+                .build();
+        Question guardada = questionRepo.save(q);
+
+        ResponseEntity<?> response = controller.evaluateQuestion(
+                new ReviewRestController.EvaluateQuestionDTO(
+                        guardada.getId(), "revisor-no-asignado@unicauca.edu.co",
+                        "APROBADA", "Evaluación no autorizada."
+                )
+        );
+
+        assertEquals(403, response.getStatusCode().value());
+        assertEquals(
+                QuestionStatus.EN_REVISION,
+                questionRepo.findById(guardada.getId()).orElseThrow().getEstado()
+        );
     }
 }

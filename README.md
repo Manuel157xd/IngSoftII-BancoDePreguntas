@@ -1,7 +1,42 @@
 # Banco de Preguntas - Arquitectura
 
 ## Descripción
-Aplicación Java Desktop monolítica organizada en tres capas: presentación, negocio y persistencia. MVC se aplica dentro de presentación; no es una capa adicional.
+El proyecto conserva la aplicación Java Desktop de la primera iteración y agrega una demo REST distribuida para la segunda. Los servicios se ejecutan como procesos Spring Boot independientes, sin Docker ni broker externo:
+
+- **Preguntas**: creación, validación, estados y persistencia en `questions.db`.
+- **Revisión**: asignaciones y evaluaciones; conserva sus datos en `reviews.db` y consulta/actualiza preguntas mediante HTTP.
+- **Notificaciones**: recibe eventos HTTP y simula el envío de correo escribiéndolo en la consola.
+- **Identidad**: autenticación y usuarios en `identity.db`.
+
+La comunicación entre Preguntas y Revisión es HTTP REST. Los eventos se envían por HTTP al servicio de Notificaciones; es una implementación didáctica para ejecutar localmente, no un broker durable ni una garantía de entrega de producción. `Main` sigue iniciando la aplicación Swing de la iteración anterior. `MicroservicesApplication` conserva el modo combinado de desarrollo; para mostrar la separación, iniciar las aplicaciones de servicio descritas abajo.
+
+## Ejecutar la demo distribuida
+
+Desde la carpeta `IngSoftII-BancoDePreguntas`, abre cuatro terminales PowerShell y ejecuta un comando en cada una. No cierres las terminales mientras uses la demo:
+
+```powershell
+mvn '-Dspring-boot.run.arguments=--app.service=notifications --spring.profiles.active=distributed --server.port=8083' spring-boot:run
+```
+
+```powershell
+mvn '-Dspring-boot.run.arguments=--app.service=questions --spring.profiles.active=distributed --server.port=8081' spring-boot:run
+```
+
+```powershell
+mvn '-Dspring-boot.run.arguments=--app.service=reviews --spring.profiles.active=distributed --server.port=8082' spring-boot:run
+```
+
+```powershell
+mvn '-Dspring-boot.run.arguments=--app.service=identity --spring.profiles.active=distributed --server.port=8084' spring-boot:run
+```
+
+Inicia primero Notificaciones y Preguntas, después Revisión e Identidad. La documentación OpenAPI está en:
+
+- Preguntas: `http://localhost:8081/swagger-ui/index.html`
+- Revisión: `http://localhost:8082/swagger-ui/index.html`
+- Identidad: `http://localhost:8084/swagger-ui/index.html`
+
+Para la demostración: crea una pregunta en Preguntas; envíala a revisión con `PATCH /api/questions/{id}/enviar-revision`; asígnale de 1 a 3 revisores desde Revisión con `POST /api/reviews/assign`; consulta `GET /api/reviews/assigned/{revisorEmail}` y evalúa con `POST /api/reviews/evaluate`. Las notificaciones simuladas se ven en la terminal del servicio Notificaciones. Las preguntas de ejemplo están en `questions.db`; usa una que esté en estado `PENDIENTE_REVISION` para probar la asignación.
 
 ## Estructura de paquetes
 
@@ -77,6 +112,12 @@ Los servicios reciben abstracciones como `UsuarioRepository`, `PasswordPolicy` y
 
 ## Patrones de diseño GoF usados
 
+La parte de microservicios incluye al menos seis patrones GoF de las tres categorías solicitadas:
+
+- **Creacionales**: Builder (`QuestionBuilder`) y Factory (`NotificationFactory`).
+- **Estructurales**: Facade (`StructuralValidationFacade`) y Adapter (`EmailSenderAdapter` / `LogEmailSenderAdapter`).
+- **De comportamiento**: State (`QuestionState`) y Observer (`DomainEventBus` en modo combinado; el modo distribuido publica eventos al servicio de notificaciones).
+
 ### Strategy
 - `PasswordHasher` y `QuestionPolicy` permiten variar hashing y validación sin cambiar los servicios.
 
@@ -92,4 +133,4 @@ Los servicios reciben abstracciones como `UsuarioRepository`, `PasswordPolicy` y
 - Posible extensión de nuevas funcionalidades.
 - Mejor testabilidad por capas.
 
-Todos los paquetes Java usan el espacio de nombres `com.taller2`. La separación organiza responsabilidades dentro de un único programa de escritorio, sin convertirlo en varios servicios o aplicaciones.
+Todos los paquetes Java usan el espacio de nombres `com.taller2`. La aplicación Swing continúa como programa de escritorio independiente; la demo REST muestra los contextos de servicio en procesos separados y mantiene bases SQLite separadas para preguntas, revisiones e identidad.

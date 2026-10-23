@@ -1,7 +1,7 @@
 package com.taller2.microservices.questions.controller;
 
-import com.taller2.microservices.events.DomainEventBus;
 import com.taller2.microservices.events.model.QuestionSubmittedEvent;
+import com.taller2.microservices.events.publisher.DomainEventPublisher;
 import com.taller2.microservices.questions.repository.QuestionMicroserviceRepository;
 import com.taller2.microservices.validation.facade.StructuralValidationFacade;
 import com.taller2.microservices.validation.model.ValidationRequest;
@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,15 +29,19 @@ public class QuestionRestController {
 
     private final QuestionMicroserviceRepository repository;
     private final StructuralValidationFacade validationFacade;
-    private final DomainEventBus eventBus;
+    private final DomainEventPublisher eventPublisher;
 
     public QuestionRestController(QuestionMicroserviceRepository repository,
                                   StructuralValidationFacade validationFacade,
-                                  DomainEventBus eventBus) {
+                                  DomainEventPublisher eventPublisher) {
+        System.out.println(">>> [INIT] QuestionRestController iniciado exitosamente.");
         this.repository = repository;
         this.validationFacade = validationFacade;
-        this.eventBus = eventBus;
+        this.eventPublisher = eventPublisher;
     }
+
+    public record AssignReviewersRequest(List<String> reviewerEmails) {}
+    public record EvaluateQuestionRequest(String reviewerEmail, String decision, String observation) {}
 
     public record CreateQuestionDTO(
             String nombre,
@@ -94,13 +99,13 @@ public class QuestionRestController {
     @GetMapping
     @Operation(summary = "Listar preguntas con filtros y paginación (HU3)", description = "Filtra por competencia, tema, dificultad, estado y autor, con paginación.")
     public ResponseEntity<?> listQuestions(
-            @RequestParam(required = false) String competencia,
-            @RequestParam(required = false) String tema,
-            @RequestParam(required = false) String nivel,
-            @RequestParam(required = false) String estado,
-            @RequestParam(required = false) Integer autorId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(value = "competencia", required = false) String competencia,
+            @RequestParam(value = "tema", required = false) String tema,
+            @RequestParam(value = "nivel", required = false) String nivel,
+            @RequestParam(value = "estado", required = false) String estado,
+            @RequestParam(value = "autorId", required = false) Integer autorId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size
     ) {
         List<Question> list = repository.findWithFilters(competencia, tema, nivel, estado, autorId, page, size);
         long total = repository.countWithFilters(competencia, tema, nivel, estado, autorId);
@@ -117,7 +122,7 @@ public class QuestionRestController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Obtener detalle de pregunta con color de estado (HU2)", description = "Retorna la pregunta con el código hexadecimal del estado según el Patrón State.")
-    public ResponseEntity<?> getQuestionById(@PathVariable int id) {
+    public ResponseEntity<?> getQuestionById(@PathVariable("id") int id) {
         Optional<Question> opt = repository.findById(id);
         if (opt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -126,8 +131,8 @@ public class QuestionRestController {
     }
 
     @PatchMapping("/{id}/enviar-revision")
-    @Operation(summary = "Enviar pregunta a revisión (HU2)", description = "Transiciona de Borrador a Pendiente de Revisión aplicando el Patrón State y emite evento asíncrono.")
-    public ResponseEntity<?> sendToReview(@PathVariable int id) {
+    @Operation(summary = "Enviar pregunta a revisión (HU2)", description = "Transiciona de Borrador a Pendiente de Revisión y publica un evento al servicio de notificaciones.")
+    public ResponseEntity<?> sendToReview(@PathVariable("id") int id) {
         Optional<Question> opt = repository.findById(id);
         if (opt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -144,9 +149,63 @@ public class QuestionRestController {
         repository.update(q);
 
         // Disparo de evento de dominio (EDA / Patrón Observer)
-        eventBus.publish(new QuestionSubmittedEvent(q.getId(), q.getNombre(), q.getAutorId()));
+        eventPublisher.publish(new QuestionSubmittedEvent(q.getId(), q.getNombre(), q.getAutorId()));
 
         return ResponseEntity.ok(toMap(q));
+    }
+
+    @PutMapping("/{id}/reviewers")
+    @Operation(summary = "Actualizar asignación de revisores", description = "Operación interna para el contexto de revisión.")
+    public ResponseEntity<?> assignReviewers(
+            @PathVariable("id") int id,
+            @RequestBody AssignReviewersRequest request
+    ) {
+        if (request.reviewerEmails() == null || request.reviewerEmails().isEmpty()
+                || request.reviewerEmails().size() > 3) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Debe asignarse entre 1 y 3 revisores"));
+        }
+        Optional<Question> opt = repository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Question question = opt.get();
+        try {
+            question.getStateObject().asignarRevisores(question, String.join(", ", request.reviewerEmails()));
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+        }
+        repository.update(question);
+        return ResponseEntity.ok(toMap(question));
+    }
+
+    @PutMapping("/{id}/evaluation")
+    @Operation(summary = "Registrar evaluación", description = "Operación interna para actualizar el estado desde el contexto de revisión.")
+    public ResponseEntity<?> evaluateQuestion(
+            @PathVariable("id") int id,
+            @RequestBody EvaluateQuestionRequest request
+    ) {
+        if (request.observation() == null || request.observation().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Las observaciones son obligatorias"));
+        }
+        Optional<Question> opt = repository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Question question = opt.get();
+        String decision = request.decision() == null ? "" : request.decision().trim().toUpperCase(Locale.ROOT);
+        try {
+            if ("APROBADA".equals(decision)) {
+                question.getStateObject().aprobar(question, request.observation());
+            } else if ("RECHAZADA".equals(decision)) {
+                question.getStateObject().rechazar(question, request.observation());
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("error", "La decisión debe ser APROBADA o RECHAZADA"));
+            }
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+        }
+        repository.update(question);
+        return ResponseEntity.ok(toMap(question));
     }
 
     private Map<String, Object> toMap(Question q) {

@@ -23,6 +23,7 @@ public class QuestionMicroserviceRepository {
     }
 
     public QuestionMicroserviceRepository(String dbUrl) {
+        System.out.println(">>> [INIT] QuestionMicroserviceRepository iniciado con: " + dbUrl);
         this.dbUrl = dbUrl;
         initTable();
     }

@@ -1,7 +1,9 @@
 package com.taller2.microservices.events;
 
 import com.taller2.microservices.events.model.DomainEvent;
+import com.taller2.microservices.events.publisher.DomainEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Profile;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -9,11 +11,11 @@ import java.util.function.Consumer;
 
 /**
  * Patrón GoF de Comportamiento: Observer
- * Bus de eventos de dominio desacoplado para la Arquitectura Orientada a Eventos (EDA).
- * Permite a los microservicios suscribirse y reaccionar asíncronamente a cambios en otros servicios.
+ * Bus local del modo combinado. En el modo distribuido, los eventos se envían por HTTP.
  */
 @Component
-public class DomainEventBus {
+@Profile("!distributed")
+public class DomainEventBus implements DomainEventPublisher {
 
     private final List<Consumer<DomainEvent>> listeners = new CopyOnWriteArrayList<>();
 
@@ -23,6 +25,7 @@ public class DomainEventBus {
         }
     }
 
+    @Override
     public void publish(DomainEvent event) {
         if (event == null) return;
         for (Consumer<DomainEvent> listener : listeners) {

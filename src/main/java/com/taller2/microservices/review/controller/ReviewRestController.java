@@ -1,13 +1,11 @@
 package com.taller2.microservices.review.controller;
 
-import com.taller2.microservices.events.DomainEventBus;
 import com.taller2.microservices.events.model.QuestionEvaluatedEvent;
 import com.taller2.microservices.events.model.ReviewersAssignedEvent;
-import com.taller2.microservices.questions.repository.QuestionMicroserviceRepository;
+import com.taller2.microservices.events.publisher.DomainEventPublisher;
+import com.taller2.microservices.questionclient.QuestionServiceClient;
+import com.taller2.microservices.questionclient.QuestionSnapshot;
 import com.taller2.microservices.review.repository.ReviewMicroserviceRepository;
-import com.taller2.negocio.model.Question;
-import com.taller2.negocio.model.QuestionStatus;
-import com.taller2.negocio.model.state.QuestionState;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -15,154 +13,162 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/reviews")
-@Tag(name = "Contexto: Revisión por Pares (Peer Review)", description = "Microservicio para asignación de 1 a 3 revisores y evaluación de preguntas (HU4 y HU5)")
+@Tag(name = "Contexto: Revisión por Pares (Peer Review)", description = "Microservicio para asignación de revisores y evaluación de preguntas (HU4 y HU5)")
 @CrossOrigin(origins = "*")
 public class ReviewRestController {
 
     private final ReviewMicroserviceRepository reviewRepository;
-    private final QuestionMicroserviceRepository questionRepository;
-    private final DomainEventBus eventBus;
+    private final QuestionServiceClient questionService;
+    private final DomainEventPublisher eventPublisher;
 
-    public ReviewRestController(ReviewMicroserviceRepository reviewRepository,
-                                QuestionMicroserviceRepository questionRepository,
-                                DomainEventBus eventBus) {
+    public ReviewRestController(
+            ReviewMicroserviceRepository reviewRepository,
+            QuestionServiceClient questionService,
+            DomainEventPublisher eventPublisher
+    ) {
         this.reviewRepository = reviewRepository;
-        this.questionRepository = questionRepository;
-        this.eventBus = eventBus;
+        this.questionService = questionService;
+        this.eventPublisher = eventPublisher;
     }
 
     public record AssignReviewersDTO(int preguntaId, List<String> revisoresEmails) {}
     public record EvaluateQuestionDTO(int preguntaId, String revisorEmail, String decision, String observaciones) {}
 
     @PostMapping("/assign")
-    @Operation(summary = "Asignar revisores (HU4)", description = "Permite al Administrador asignar entre 1 y 3 revisores a una pregunta 'Pendiente de revisión' y notifica por email.")
+    @Operation(summary = "Asignar revisores (HU4)", description = "Asigna entre 1 y 3 revisores y envía un evento HTTP al servicio de notificaciones.")
     public ResponseEntity<?> assignReviewers(@RequestBody AssignReviewersDTO dto) {
-        // Validación obligatoria HU4: entre 1 y 3 revisores
-        if (dto.revisoresEmails() == null || dto.revisoresEmails().isEmpty() || dto.revisoresEmails().size() > 3) {
+        if (dto.revisoresEmails() == null || dto.revisoresEmails().isEmpty()
+                || dto.revisoresEmails().size() > 3) {
             return ResponseEntity.badRequest().body(Map.of(
-                    "error", "La regla de negocio exige asignar entre 1 y 3 revisores (recibidos: " +
-                            (dto.revisoresEmails() == null ? 0 : dto.revisoresEmails().size()) + ")"
+                    "error", "La regla de negocio exige asignar entre 1 y 3 revisores"
             ));
         }
 
-        Optional<Question> opt = questionRepository.findById(dto.preguntaId());
-        if (opt.isEmpty()) {
+        var questionOpt = questionService.findById(dto.preguntaId());
+        if (questionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-
-        Question q = opt.get();
-        if (q.getEstado() != QuestionStatus.PENDIENTE_REVISION && q.getEstado() != QuestionStatus.EN_REVISION) {
+        QuestionSnapshot question = questionOpt.get();
+        if (!"PENDIENTE_REVISION".equals(question.estado())
+                && !"EN_REVISION".equals(question.estado())) {
             return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Solo se pueden asignar revisores a preguntas en estado PENDIENTE_REVISION"
+                    "error", "Solo se pueden asignar revisores a preguntas pendientes de revisión"
             ));
         }
 
-        // Transición de estado con Patrón State
-        QuestionState state = q.getStateObject();
-        String revisoresConcatenados = String.join(", ", dto.revisoresEmails());
+        List<String> reviewerEmails = dto.revisoresEmails().stream()
+                .map(String::trim)
+                .toList();
+        QuestionSnapshot updatedQuestion;
         try {
-            state.asignarRevisores(q, revisoresConcatenados);
-        } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            updatedQuestion = questionService.assignReviewers(question.id(), reviewerEmails);
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
         }
 
-        questionRepository.update(q);
-
-        // Guardar cada asignación en reviews.db
-        for (String email : dto.revisoresEmails()) {
-            reviewRepository.createAssignment(q.getId(), email.trim());
+        for (String email : reviewerEmails) {
+            reviewRepository.createAssignment(updatedQuestion.id(), email);
         }
-
-        // Emitir evento asíncrono para notificaciones por email (EDA / Observer)
-        eventBus.publish(new ReviewersAssignedEvent(q.getId(), q.getNombre(), dto.revisoresEmails()));
+        eventPublisher.publish(new ReviewersAssignedEvent(
+                updatedQuestion.id(), updatedQuestion.nombre(), reviewerEmails
+        ));
 
         return ResponseEntity.ok(Map.of(
-                "mensaje", "Revisores asignados correctamente y notificaciones enviadas por correo",
-                "preguntaId", q.getId(),
-                "nuevoEstado", q.getEstado().name(),
-                "colorHex", q.getColorHex(),
-                "revisores", dto.revisoresEmails()
+                "mensaje", "Revisores asignados y evento enviado al servicio de notificaciones",
+                "preguntaId", updatedQuestion.id(),
+                "nuevoEstado", updatedQuestion.estado(),
+                "colorHex", updatedQuestion.colorHex(),
+                "revisores", reviewerEmails
         ));
     }
 
     @GetMapping("/assigned/{revisorEmail}")
-    @Operation(summary = "Listar preguntas asignadas al revisor (HU5)", description = "Permite al docente revisor consultar las preguntas asignadas para su evaluación.")
-    public ResponseEntity<?> getAssignedQuestions(@PathVariable String revisorEmail) {
-        List<ReviewMicroserviceRepository.ReviewAssignment> assignments = reviewRepository.findByRevisor(revisorEmail);
+    @Operation(summary = "Listar preguntas asignadas al revisor (HU5)", description = "Consulta asignaciones y obtiene los detalles del servicio de preguntas.")
+    public ResponseEntity<?> getAssignedQuestions(@PathVariable("revisorEmail") String reviewerEmail) {
+        List<ReviewMicroserviceRepository.ReviewAssignment> assignments =
+                reviewRepository.findByRevisor(reviewerEmail);
         List<Map<String, Object>> result = new ArrayList<>();
 
-        for (ReviewMicroserviceRepository.ReviewAssignment a : assignments) {
-            Optional<Question> qOpt = questionRepository.findById(a.preguntaId());
-            if (qOpt.isPresent()) {
-                Question q = qOpt.get();
+        for (ReviewMicroserviceRepository.ReviewAssignment assignment : assignments) {
+            questionService.findById(assignment.preguntaId()).ifPresent(question -> {
                 Map<String, Object> item = new java.util.HashMap<>();
-                item.put("asignacionId", a.id());
-                item.put("preguntaId", q.getId());
-                item.put("nombre", q.getNombre());
-                item.put("texto", q.getTexto());
-                item.put("contexto", q.getContexto());
-                item.put("opciones", q.getOpciones());
-                item.put("justificacion", q.getJustificacion());
-                item.put("bibliografia", q.getBibliografia());
-                item.put("competencia", q.getCompetencia());
-                item.put("tema", q.getTema());
-                item.put("nivelDificultad", q.getNivelDificultad());
-                item.put("estadoPregunta", q.getEstado().name());
-                item.put("colorHex", q.getColorHex());
-                item.put("estadoAsignacion", a.estado());
-                item.put("observaciones", a.observaciones() != null ? a.observaciones() : "");
+                item.put("asignacionId", assignment.id());
+                item.put("preguntaId", question.id());
+                item.put("nombre", question.nombre());
+                item.put("texto", question.texto());
+                item.put("contexto", question.contexto());
+                item.put("opciones", question.opciones());
+                item.put("justificacion", question.justificacion());
+                item.put("bibliografia", question.bibliografia());
+                item.put("competencia", question.competencia());
+                item.put("tema", question.tema());
+                item.put("nivelDificultad", question.nivelDificultad());
+                item.put("estadoPregunta", question.estado());
+                item.put("colorHex", question.colorHex());
+                item.put("estadoAsignacion", assignment.estado());
+                item.put("observaciones", assignment.observaciones() == null ? "" : assignment.observaciones());
                 result.add(item);
-            }
+            });
         }
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/evaluate")
-    @Operation(summary = "Evaluar pregunta con observaciones (HU5)", description = "El revisor deja observaciones y cambia el estado a Aprobada o Rechazada; se notifica al autor.")
+    @Operation(summary = "Evaluar pregunta con observaciones (HU5)", description = "Registra el resultado y envía un evento HTTP al servicio de notificaciones.")
     public ResponseEntity<?> evaluateQuestion(@RequestBody EvaluateQuestionDTO dto) {
-        if (dto.observaciones() == null || dto.observaciones().trim().isEmpty()) {
+        if (dto.observaciones() == null || dto.observaciones().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Las observaciones del revisor son obligatorias"));
         }
+        if (dto.revisorEmail() == null || dto.revisorEmail().isBlank() || dto.decision() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El revisor y la decisión son obligatorios"));
+        }
 
-        Optional<Question> opt = questionRepository.findById(dto.preguntaId());
-        if (opt.isEmpty()) {
+        var questionOpt = questionService.findById(dto.preguntaId());
+        if (questionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-
-        Question q = opt.get();
-        QuestionState state = q.getStateObject();
-
-        String decision = dto.decision().trim().toUpperCase();
-        try {
-            if ("APROBADA".equals(decision)) {
-                state.aprobar(q, dto.observaciones());
-            } else if ("RECHAZADA".equals(decision)) {
-                state.rechazar(q, dto.observaciones());
-            } else {
-                return ResponseEntity.badRequest().body(Map.of("error", "La decisión debe ser 'APROBADA' o 'RECHAZADA'"));
-            }
-        } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        boolean reviewerAssigned = reviewRepository.findByRevisor(dto.revisorEmail()).stream()
+                .anyMatch(assignment -> assignment.preguntaId() == dto.preguntaId());
+        if (!reviewerAssigned) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "El revisor no tiene asignada esta pregunta"
+            ));
         }
 
-        questionRepository.update(q);
-        reviewRepository.recordEvaluation(q.getId(), dto.revisorEmail(), decision, dto.observaciones());
+        String decision = dto.decision().trim().toUpperCase(Locale.ROOT);
+        if (!"APROBADA".equals(decision) && !"RECHAZADA".equals(decision)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "La decisión debe ser 'APROBADA' o 'RECHAZADA'"
+            ));
+        }
 
-        // Emitir evento de dominio para notificar al autor (EDA)
-        eventBus.publish(new QuestionEvaluatedEvent(
-                q.getId(), q.getNombre(), dto.revisorEmail(), decision, dto.observaciones(), q.getAutorId()
+        QuestionSnapshot evaluatedQuestion;
+        try {
+            evaluatedQuestion = questionService.evaluate(
+                    dto.preguntaId(), dto.revisorEmail(), decision, dto.observaciones()
+            );
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+        }
+
+        reviewRepository.recordEvaluation(
+                evaluatedQuestion.id(), dto.revisorEmail(), decision, dto.observaciones()
+        );
+        eventPublisher.publish(new QuestionEvaluatedEvent(
+                evaluatedQuestion.id(), evaluatedQuestion.nombre(), dto.revisorEmail(),
+                decision, dto.observaciones(), evaluatedQuestion.autorId()
         ));
 
         return ResponseEntity.ok(Map.of(
-                "mensaje", "Evaluación registrada exitosamente y notificación enviada al autor",
-                "preguntaId", q.getId(),
-                "nuevoEstado", q.getEstado().name(),
-                "colorHex", q.getColorHex(),
+                "mensaje", "Evaluación registrada y evento de notificación publicado",
+                "preguntaId", evaluatedQuestion.id(),
+                "nuevoEstado", evaluatedQuestion.estado(),
+                "colorHex", evaluatedQuestion.colorHex(),
                 "observaciones", dto.observaciones()
         ));
     }

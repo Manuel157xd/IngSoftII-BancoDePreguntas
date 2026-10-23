@@ -21,8 +21,8 @@ class NotificationServiceTest {
     void setUp() {
         eventBus = new DomainEventBus();
         emailAdapter = new LogEmailSenderAdapter();
-        notificationService = new NotificationService(eventBus, emailAdapter);
-        notificationService.init();
+        notificationService = new NotificationService(emailAdapter);
+        eventBus.subscribe(notificationService::handleEvent);
     }
 
     @Test
