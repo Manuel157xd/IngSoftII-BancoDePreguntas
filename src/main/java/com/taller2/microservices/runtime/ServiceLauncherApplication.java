@@ -23,6 +23,10 @@ public final class ServiceLauncherApplication {
             MicroservicesApplication.main(applicationArgs);
             return;
         }
+        if ("desktop".equals(service)) {
+            com.taller2.Main.main(applicationArgs);
+            return;
+        }
 
         Class<?> application = switch (service) {
             case "questions" -> QuestionsServiceApplication.class;
@@ -31,7 +35,7 @@ public final class ServiceLauncherApplication {
             case "identity" -> IdentityServiceApplication.class;
             default -> throw new IllegalArgumentException(
                     "Servicio no reconocido: " + service
-                            + ". Valores: questions, reviews, notifications, identity, combined"
+                            + ". Valores: questions, reviews, notifications, identity, combined, desktop"
             );
         };
         SpringApplication.run(application, applicationArgs);

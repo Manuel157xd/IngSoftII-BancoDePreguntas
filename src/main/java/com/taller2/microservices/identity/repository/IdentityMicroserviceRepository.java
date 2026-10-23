@@ -42,6 +42,7 @@ public class IdentityMicroserviceRepository {
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
             seedDefaultUsers(conn);
+             migrateDemoAuthorRole(conn);
         } catch (SQLException e) {
             System.err.println("[IdentityRepository] Error inicializando tabla usuarios: " + e.getMessage());
         }
@@ -54,13 +55,22 @@ public class IdentityMicroserviceRepository {
                 String insert = """
                     INSERT INTO usuarios (login, nombre_completo, password_hash, rol, estado) VALUES
                     ('admin@unicauca.edu.co', 'Admin General', 'admin123', 'ADMINISTRADOR', 'ACTIVO'),
-                    ('autor@unicauca.edu.co', 'Prof. Carlos Autor', 'autor123', 'DOCENTE', 'ACTIVO'),
+                    ('autor@unicauca.edu.co', 'Prof. Carlos Autor', 'autor123', 'AUTOR_PREGUNTAS', 'ACTIVO'),
                     ('revisor1@unicauca.edu.co', 'Prof. Revisor Uno', 'revisor123', 'REVISOR', 'ACTIVO'),
                     ('revisor2@unicauca.edu.co', 'Prof. Revisor Dos', 'revisor123', 'REVISOR', 'ACTIVO'),
                     ('revisor3@unicauca.edu.co', 'Prof. Revisor Tres', 'revisor123', 'REVISOR', 'ACTIVO');
                 """;
                 stmt.execute(insert);
             }
+        }
+    }
+
+    private void migrateDemoAuthorRole(Connection conn) throws SQLException {
+        try (PreparedStatement statement = conn.prepareStatement(
+                "UPDATE usuarios SET rol = 'AUTOR_PREGUNTAS' "
+                        + "WHERE LOWER(login) = LOWER(?) AND rol = 'DOCENTE'")) {
+            statement.setString(1, "autor@unicauca.edu.co");
+            statement.executeUpdate();
         }
     }
 
@@ -110,6 +120,43 @@ public class IdentityMicroserviceRepository {
             System.err.println("[IdentityRepository] Error en findAll: " + e.getMessage());
         }
         return list;
+    }
+
+    public Optional<Usuario> findById(int id) {
+        String sql = "SELECT id, login, nombre_completo, password_hash, rol, estado FROM usuarios WHERE id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error buscando usuario por id: " + e.getMessage(), e);
+        }
+    }
+
+    public void update(int id, String name, Rol role, EstadoUsuario state) {
+        String sql = "UPDATE usuarios SET nombre_completo = ?, rol = ?, estado = ? WHERE id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, name);
+            ps.setString(2, role.name());
+            ps.setString(3, state.name());
+            ps.setInt(4, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error actualizando usuario: " + e.getMessage(), e);
+        }
+    }
+
+    public void delete(int id) {
+        try (Connection conn = DriverManager.getConnection(dbUrl);
+             PreparedStatement ps = conn.prepareStatement("DELETE FROM usuarios WHERE id = ?")) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error eliminando usuario: " + e.getMessage(), e);
+        }
     }
 
     public Usuario save(Usuario u) {

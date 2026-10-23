@@ -125,6 +125,40 @@ class QuestionServiceTest {
         assertEquals(QuestionStatus.PENDIENTE_REVISION, events.get(0).getNewValue());
     }
 
+    @Test
+    void administradorAsignaRevisoresPorGatewayYActualizaEstado() {
+        MemoryRepository repository = new MemoryRepository();
+        Question pending = pregunta(8, 10, "Pregunta pendiente");
+        pending.setEstado(QuestionStatus.PENDIENTE_REVISION);
+        repository.guardar(pending);
+        List<String> assignedEmails = new ArrayList<>();
+        ReviewGateway gateway = new ReviewGateway() {
+            @Override
+            public QuestionStatus assignReviewers(int questionId, List<String> emails) {
+                assignedEmails.addAll(emails);
+                return QuestionStatus.EN_REVISION;
+            }
+
+            @Override
+            public List<AssignedQuestion> listAssignedQuestions(String reviewerEmail) {
+                return List.of();
+            }
+
+            @Override
+            public void evaluate(int questionId, String reviewerEmail, String decision, String observation) {}
+        };
+        QuestionService service = new QuestionService(repository, new QuestionValidator(), gateway);
+
+        service.asignarRevisorYNotificar(
+                pending, "revisor1@unicauca.edu.co, revisor2@unicauca.edu.co",
+                usuario(1, Rol.ADMINISTRADOR)
+        );
+
+        assertEquals(List.of("revisor1@unicauca.edu.co", "revisor2@unicauca.edu.co"), assignedEmails);
+        assertEquals(QuestionStatus.EN_REVISION, pending.getEstado());
+        assertEquals("revisor1@unicauca.edu.co, revisor2@unicauca.edu.co", pending.getRevisorAsignado());
+    }
+
     private static class MemoryRepository implements QuestionRepository {
         private final List<Question> questions = new ArrayList<>();
 

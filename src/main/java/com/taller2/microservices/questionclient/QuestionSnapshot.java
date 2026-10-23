@@ -10,10 +10,12 @@ public record QuestionSnapshot(
         String texto,
         String contexto,
         List<String> opciones,
+        int respuestaCorrecta,
         String justificacion,
         String bibliografia,
         String competencia,
         String tema,
+        String subtema,
         String nivelDificultad,
         String estado,
         String colorHex,
@@ -51,10 +53,12 @@ public record QuestionSnapshot(
                 text(values.get("texto")),
                 text(values.get("contexto")),
                 options,
+                integer(values.get("respuestaCorrecta")),
                 text(values.get("justificacion")),
                 text(values.get("bibliografia")),
                 text(values.get("competencia")),
                 text(values.get("tema")),
+                text(values.get("subtema")),
                 text(values.get("nivelDificultad")),
                 text(values.get("estado")),
                 text(values.get("colorHex")),
@@ -64,5 +68,12 @@ public record QuestionSnapshot(
 
     private static String text(Object value) {
         return value == null ? "" : String.valueOf(value);
+    }
+
+    private static int integer(Object value) {
+        if (!(value instanceof Number number)) {
+            throw new IllegalStateException("La respuesta del servicio de preguntas no contiene una respuesta correcta válida");
+        }
+        return number.intValue();
     }
 }

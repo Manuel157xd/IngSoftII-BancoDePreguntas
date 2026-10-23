@@ -2,26 +2,38 @@ package com.taller2.negocio.service;
 
 import java.util.List;
 
+import com.taller2.negocio.validation.PasswordPolicy;
 import com.taller2.negocio.model.EstadoUsuario;
 import com.taller2.negocio.model.Usuario;
 import com.taller2.persistencia.repository.UsuarioRepository;
+import com.taller2.seguridad.CredentialAuthenticator;
 import com.taller2.seguridad.PasswordHasher;
-import com.taller2.negocio.validation.PasswordPolicy;
 
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordPolicy passwordValidator;
     private final PasswordHasher passwordHasher;
+    private final CredentialAuthenticator credentialAuthenticator;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
             PasswordPolicy passwordValidator,
             PasswordHasher passwordHasher
     ) {
+        this(usuarioRepository, passwordValidator, passwordHasher, null);
+    }
+
+    public UsuarioService(
+            UsuarioRepository usuarioRepository,
+            PasswordPolicy passwordValidator,
+            PasswordHasher passwordHasher,
+            CredentialAuthenticator credentialAuthenticator
+    ) {
         this.usuarioRepository = usuarioRepository;
         this.passwordValidator = passwordValidator;
         this.passwordHasher = passwordHasher;
+        this.credentialAuthenticator = credentialAuthenticator;
     }
 
     public void registrarUsuario(Usuario usuario, String password) {
@@ -53,76 +65,52 @@ public class UsuarioService {
     
 
     public Usuario iniciarSesion(String login, String password) {
-
-    Usuario usuario = usuarioRepository
-            .buscarPorLogin(login)
-            .orElseThrow(() ->
-                    new IllegalArgumentException(
-                            "Usuario o contraseña incorrectos."
-                    )
-            );
-
-    if (usuario.getEstado() != EstadoUsuario.ACTIVO) {
-        throw new IllegalArgumentException(
-                "El usuario está inactivo."
-        );
-    }
-
-    if (!passwordHasher.verificar(
-            password,
-            usuario.getPasswordHash()
-    )) {
-        throw new IllegalArgumentException(
-                "Usuario o contraseña incorrectos."
-        );
-    }
-
-    return usuario;
-}
-public void actualizarUsuario(Usuario usuario) {
-
-    if (usuario == null) {
-        throw new IllegalArgumentException(
-                "El usuario no puede ser nulo."
-        );
-    }
-
-    usuarioRepository.actualizar(usuario);
-}
-
-public void eliminarUsuario(int id) {
-
-    usuarioRepository.eliminar(id);
-}
-public List<Usuario> listarUsuarios() {
-
-    return usuarioRepository.listarTodos();
-}
-public void actualizarUsuario(
-        Usuario usuario,
-        String nuevaPassword) {
-
-    if (usuario == null) {
-        throw new IllegalArgumentException(
-                "El usuario no puede ser nulo."
-        );
-    }
-
-    if (nuevaPassword != null &&
-            !nuevaPassword.isBlank()) {
-
-        if (!passwordValidator.esValida(nuevaPassword)) {
-            throw new IllegalArgumentException(
-                    "La nueva contraseña no cumple los requisitos."
-            );
+        if (credentialAuthenticator != null) {
+            return credentialAuthenticator.autenticar(login, password);
         }
 
-        String hash =
-                passwordHasher.hash(nuevaPassword);
+        Usuario usuario = usuarioRepository
+                .buscarPorLogin(login)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario o contraseña incorrectos."));
 
-        usuario.setPasswordHash(hash);
+        if (usuario.getEstado() != EstadoUsuario.ACTIVO) {
+            throw new IllegalArgumentException("El usuario está inactivo.");
+        }
+
+        if (!passwordHasher.verificar(password, usuario.getPasswordHash())) {
+            throw new IllegalArgumentException("Usuario o contraseña incorrectos.");
+        }
+
+        return usuario;
     }
 
-    usuarioRepository.actualizar(usuario);
-}
+    public void actualizarUsuario(Usuario usuario) {
+        if (usuario == null) {
+            throw new IllegalArgumentException("El usuario no puede ser nulo.");
+        }
+        usuarioRepository.actualizar(usuario);
+    }
+
+    public void eliminarUsuario(int id) {
+        usuarioRepository.eliminar(id);
+    }
+
+    public List<Usuario> listarUsuarios() {
+        return usuarioRepository.listarTodos();
+    }
+
+    public void actualizarUsuario(Usuario usuario, String nuevaPassword) {
+        if (usuario == null) {
+            throw new IllegalArgumentException("El usuario no puede ser nulo.");
+        }
+
+        if (nuevaPassword != null && !nuevaPassword.isBlank()) {
+            if (!passwordValidator.esValida(nuevaPassword)) {
+                throw new IllegalArgumentException("La nueva contraseña no cumple los requisitos.");
+            }
+            usuario.setPasswordHash(passwordHasher.hash(nuevaPassword));
+        }
+
+        usuarioRepository.actualizar(usuario);
+    }
 }

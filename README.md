@@ -36,6 +36,14 @@ Inicia primero Notificaciones y Preguntas, después Revisión e Identidad. La do
 - Revisión: `http://localhost:8082/swagger-ui/index.html`
 - Identidad: `http://localhost:8084/swagger-ui/index.html`
 
+Con los cuatro servicios arriba, inicia la interfaz Swing reutilizada desde una quinta terminal:
+
+```powershell
+mvn '-Dspring-boot.run.arguments=--app.service=desktop' spring-boot:run
+```
+
+La interfaz Swing ahora consume Identidad, Preguntas y Revisión por HTTP a través de `persistencia.remote`; no inicializa ni accede a la base SQLite de la aplicación monolítica. En el login puedes usar las cuentas de demostración. En el formulario de preguntas, el administrador puede asignar de uno a tres correos separados por coma. Un usuario con rol `REVISOR` verá el botón “Mis preguntas asignadas” para abrir la vista de evaluación. Las URLs se pueden cambiar con propiedades `banco.services.questions.url`, `banco.services.identity.url`, `banco.services.reviews.url` o con variables de entorno `BANCO_QUESTIONS_URL`, `BANCO_IDENTITY_URL`, `BANCO_REVIEWS_URL`.
+
 Para la demostración: crea una pregunta en Preguntas; envíala a revisión con `PATCH /api/questions/{id}/enviar-revision`; asígnale de 1 a 3 revisores desde Revisión con `POST /api/reviews/assign`; consulta `GET /api/reviews/assigned/{revisorEmail}` y evalúa con `POST /api/reviews/evaluate`. Las notificaciones simuladas se ven en la terminal del servicio Notificaciones. Las preguntas de ejemplo están en `questions.db`; usa una que esté en estado `PENDIENTE_REVISION` para probar la asignación.
 
 ## Estructura de paquetes
@@ -43,6 +51,12 @@ Para la demostración: crea una pregunta en Preguntas; envíala a revisión con 
 ```text
 com.taller2
 ├── Main.java
+├── microservices
+│   ├── identity
+│   ├── questions
+│   ├── review
+│   ├── notification
+│   └── runtime
 ├── presentacion
 │   ├── controller
 │   │   ├── QuestionController.java
@@ -58,7 +72,8 @@ com.taller2
 │       └── QuestionValidator.java
 ├── persistencia
 │   ├── database
-│   └── repository
+│   ├── repository
+│   └── remote
 └── seguridad
 ```
 
@@ -71,7 +86,9 @@ com.taller2
 ### 3. Capa de persistencia
 `persistencia.repository` define los contratos y las implementaciones SQLite. `persistencia.database` configura conexiones e inicializa las tablas.
 
-`seguridad` contiene abstracciones e implementaciones para el hashing de contraseñas. `Main` construye las dependencias concretas y abre la primera vista.
+`persistencia.remote` contiene los adaptadores HTTP que implementan los contratos de repositorio del frontend y delegan las operaciones en Identidad, Preguntas y Revisión. En el modo de escritorio, `Main` ensambla esos adaptadores y abre la vista de login; no inicializa las bases SQLite locales de la aplicación monolítica. Cada microservicio conserva su propia persistencia.
+
+`persistencia.repository` y `persistencia.database` mantienen las implementaciones SQLite de la primera iteración, utilizadas por las pruebas y el modo monolítico. `seguridad` contiene abstracciones e implementaciones para el hashing de contraseñas.
 
 ## Patrón MVC
 La aplicación usa el micro-patrón MVC de forma parcial:
@@ -93,8 +110,7 @@ La estructura separa las responsabilidades principales por clase:
 
 ### OCP (Open/Closed Principle)
 La lógica está abstraída con interfaces como:
-- `UsuarioRepository`
-- `QuestionRepository`
+- `UsuarioRepository` y `QuestionRepository`, implementados por SQLite en el modo local y por adaptadores HTTP en el escritorio conectado a microservicios
 - `PasswordPolicy`
 - `PasswordHasher`
 - `QuestionPolicy`
@@ -133,4 +149,4 @@ La parte de microservicios incluye al menos seis patrones GoF de las tres catego
 - Posible extensión de nuevas funcionalidades.
 - Mejor testabilidad por capas.
 
-Todos los paquetes Java usan el espacio de nombres `com.taller2`. La aplicación Swing continúa como programa de escritorio independiente; la demo REST muestra los contextos de servicio en procesos separados y mantiene bases SQLite separadas para preguntas, revisiones e identidad.
+Todos los paquetes Java usan el espacio de nombres `com.taller2`. La interfaz Swing se ejecuta como un proceso de escritorio separado y accede a los servicios por HTTP; la demo REST muestra los contextos de servicio en procesos separados y mantiene bases SQLite separadas para preguntas, revisiones e identidad.

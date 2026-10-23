@@ -10,17 +10,25 @@ import javax.swing.JPanel;
 import com.taller2.negocio.model.Usuario;
 import com.taller2.negocio.service.UsuarioService;
 import com.taller2.presentacion.controller.QuestionController;
+import com.taller2.presentacion.controller.ReviewController;
 
 public class DashboardView extends JFrame {
     private final Usuario usuario;
     private final UsuarioService usuarioService;
     private final QuestionController questionController;
+    private final ReviewController reviewController;
 
     public DashboardView(Usuario usuario, UsuarioService usuarioService,
                          QuestionController questionController) {
+        this(usuario, usuarioService, questionController, null);
+    }
+
+    public DashboardView(Usuario usuario, UsuarioService usuarioService,
+                         QuestionController questionController, ReviewController reviewController) {
         this.usuario = usuario;
         this.usuarioService = usuarioService;
         this.questionController = questionController;
+        this.reviewController = reviewController;
         initComponents();
     }
 
@@ -34,6 +42,11 @@ public class DashboardView extends JFrame {
         JButton preguntas = new JButton("Banco de preguntas");
         preguntas.addActionListener(e -> new PreguntasView(questionController, usuario).setVisible(true));
         panel.add(preguntas);
+        if (usuario.getRol() == com.taller2.negocio.model.Rol.REVISOR && reviewController != null) {
+            JButton reviews = new JButton("Mis preguntas asignadas");
+            reviews.addActionListener(e -> new ReviewsView(usuario, reviewController).setVisible(true));
+            panel.add(reviews);
+        }
 /* 
         if (kernel != null) {
             JButton plugins = new JButton("Ejecutar plugin");
@@ -49,7 +62,11 @@ public class DashboardView extends JFrame {
 
         JButton cerrar = new JButton("Cerrar sesión");
         cerrar.addActionListener(e -> {
-            new LoginView(usuarioService, questionController).setVisible(true);
+            new LoginView(
+                    new com.taller2.presentacion.controller.UsuarioController(usuarioService),
+                    questionController,
+                    reviewController
+            ).setVisible(true);
             dispose();
         });
         panel.add(cerrar);

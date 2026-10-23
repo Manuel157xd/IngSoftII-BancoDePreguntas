@@ -103,10 +103,12 @@ public class ReviewRestController {
                 item.put("texto", question.texto());
                 item.put("contexto", question.contexto());
                 item.put("opciones", question.opciones());
+                item.put("respuestaCorrecta", question.respuestaCorrecta());
                 item.put("justificacion", question.justificacion());
                 item.put("bibliografia", question.bibliografia());
                 item.put("competencia", question.competencia());
                 item.put("tema", question.tema());
+                item.put("subtema", question.subtema());
                 item.put("nivelDificultad", question.nivelDificultad());
                 item.put("estadoPregunta", question.estado());
                 item.put("colorHex", question.colorHex());

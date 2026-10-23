@@ -239,6 +239,17 @@ public class QuestionMicroserviceRepository {
         }
     }
 
+    public void delete(int id) {
+        String sql = "DELETE FROM preguntas WHERE id = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error eliminando pregunta: " + e.getMessage(), e);
+        }
+    }
+
     private Question mapRow(ResultSet rs) throws SQLException {
         String ops = rs.getString("opciones");
         List<String> opcionesList = (ops != null && !ops.isEmpty())

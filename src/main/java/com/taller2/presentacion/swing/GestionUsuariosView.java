@@ -50,8 +50,13 @@ public class GestionUsuariosView extends JFrame {
         if (user == null) return;
         if (JOptionPane.showConfirmDialog(this, "¿Eliminar el usuario seleccionado?",
                 "Confirmar", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-            service.eliminarUsuario(user.getId());
-            refrescar();
+            try {
+                service.eliminarUsuario(user.getId());
+                refrescar();
+            } catch (RuntimeException exception) {
+                JOptionPane.showMessageDialog(this, exception.getMessage(),
+                        "No se pudo eliminar el usuario", JOptionPane.WARNING_MESSAGE);
+            }
         }
     }
 }

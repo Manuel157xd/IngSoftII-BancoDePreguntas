@@ -17,11 +17,21 @@ public class QuestionService {
 
     private final QuestionRepository repository;
     private final QuestionPolicy questionPolicy;
+    private final ReviewGateway reviewGateway;
     private final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
     public QuestionService(QuestionRepository repository, QuestionPolicy questionPolicy) {
+        this(repository, questionPolicy, null);
+    }
+
+    public QuestionService(
+            QuestionRepository repository,
+            QuestionPolicy questionPolicy,
+            ReviewGateway reviewGateway
+    ) {
         this.repository = repository;
         this.questionPolicy = questionPolicy;
+        this.reviewGateway = reviewGateway;
     }
 
     public void addPropertyChangeListener(PropertyChangeListener listener) {
@@ -170,6 +180,30 @@ public class QuestionService {
                 .orElseThrow(() -> new IllegalArgumentException("La pregunta ya no existe."));
         if (persisted.getEstado() != QuestionStatus.PENDIENTE_REVISION) {
             throw new IllegalArgumentException("La pregunta debe estar pendiente de revisión.");
+        }
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Ingrese al menos un email válido del revisor.");
+        }
+        if (reviewGateway != null) {
+            List<String> reviewerEmails = java.util.Arrays.stream(email.split("[,;]"))
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList();
+            if (reviewerEmails.isEmpty() || reviewerEmails.size() > 3
+                    || reviewerEmails.stream().anyMatch(value -> !value.contains("@"))) {
+                throw new IllegalArgumentException(
+                        "Ingrese entre 1 y 3 correos válidos, separados por coma."
+                );
+            }
+            QuestionStatus newStatus = reviewGateway.assignReviewers(
+                    persisted.getId(), reviewerEmails
+            );
+            persisted.setRevisorAsignado(String.join(", ", reviewerEmails));
+            persisted.setEstado(newStatus);
+            question.setRevisorAsignado(persisted.getRevisorAsignado());
+            question.setEstado(newStatus);
+            support.firePropertyChange(STATUS_PROPERTY, QuestionStatus.PENDIENTE_REVISION, newStatus);
+            return;
         }
         if (email == null || email.isBlank() || !email.contains("@")) {
             throw new IllegalArgumentException("Ingrese un email válido del revisor.");

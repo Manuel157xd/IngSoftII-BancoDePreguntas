@@ -129,7 +129,7 @@ public class PreguntasView extends JFrame {
         agregarCampo(form, "Estado:", status, row++);
 
         if (controller.puedeAsignarRevisor(usuario)) {
-            agregarCampo(form, "Email Revisor Asignado:", reviewerEmail, row++);
+            agregarCampo(form, "Email(s) revisor (separados por coma):", reviewerEmail, row++);
         }
 
         // Botones de acción
@@ -384,7 +384,7 @@ public class PreguntasView extends JFrame {
             controller.cambiarEstado(usuario, question, nuevoEstado);
             cargarPreguntas();
             JOptionPane.showMessageDialog(this, "Estado actualizado exitosamente.");
-        } catch (IllegalArgumentException exception) {
+        } catch (RuntimeException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(), "No se pudo actualizar",
                     JOptionPane.WARNING_MESSAGE);
         }
@@ -398,7 +398,7 @@ public class PreguntasView extends JFrame {
         try {
             controller.asignarRevisor(usuario, question, email);
             JOptionPane.showMessageDialog(this, "Revisor asignado. Email de notificación enviado a: " + email);
-        } catch (IllegalArgumentException exception) {
+        } catch (RuntimeException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(), "No se pudo asignar el revisor",
                     JOptionPane.WARNING_MESSAGE);
         }

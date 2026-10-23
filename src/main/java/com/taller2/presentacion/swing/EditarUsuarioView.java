@@ -25,12 +25,17 @@ public class EditarUsuarioView extends JFrame {
         state.setSelectedItem(usuario.getEstado());
         JButton save = new JButton("Guardar");
         save.addActionListener(e -> {
-            usuario.setNombreCompleto(name.getText().trim());
-            usuario.setRol((Rol) role.getSelectedItem());
-            usuario.setEstado((EstadoUsuario) state.getSelectedItem());
-            service.actualizarUsuario(usuario);
-            onSaved.run();
-            dispose();
+            try {
+                usuario.setNombreCompleto(name.getText().trim());
+                usuario.setRol((Rol) role.getSelectedItem());
+                usuario.setEstado((EstadoUsuario) state.getSelectedItem());
+                service.actualizarUsuario(usuario);
+                onSaved.run();
+                dispose();
+            } catch (RuntimeException exception) {
+                javax.swing.JOptionPane.showMessageDialog(this, exception.getMessage(),
+                        "No se pudo actualizar el usuario", javax.swing.JOptionPane.WARNING_MESSAGE);
+            }
         });
         JPanel panel = new JPanel(new GridLayout(0, 2, 8, 8));
         panel.add(new JLabel("Nombre completo:")); panel.add(name);

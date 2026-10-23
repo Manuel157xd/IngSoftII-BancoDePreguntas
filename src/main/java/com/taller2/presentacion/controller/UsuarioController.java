@@ -22,7 +22,7 @@ public class UsuarioController {
             if (onSuccess != null) {
                 onSuccess.run();
             }
-        } catch (IllegalArgumentException ex) {
+        } catch (RuntimeException ex) {
             if (onError != null) {
                 onError.accept(ex.getMessage());
             }
@@ -35,7 +35,7 @@ public class UsuarioController {
             if (onSuccess != null) {
                 onSuccess.accept(usuario);
             }
-        } catch (IllegalArgumentException ex) {
+        } catch (RuntimeException ex) {
             if (onError != null) {
                 onError.accept(ex.getMessage());
             }

@@ -56,8 +56,9 @@ public class LocalQuestionServiceClient implements QuestionServiceClient {
     private static QuestionSnapshot snapshot(Question question) {
         return new QuestionSnapshot(
                 question.getId(), question.getNombre(), question.getTexto(), question.getContexto(),
-                question.getOpciones(), question.getJustificacion(), question.getBibliografia(),
-                question.getCompetencia(), question.getTema(), question.getNivelDificultad(),
+                question.getOpciones(), question.getRespuestaCorrecta(), question.getJustificacion(),
+                question.getBibliografia(), question.getCompetencia(), question.getTema(),
+                question.getSubtema(), question.getNivelDificultad(),
                 question.getEstado().name(), question.getColorHex(), question.getAutorId()
         );
     }

@@ -42,6 +42,22 @@ public class QuestionRestController {
 
     public record AssignReviewersRequest(List<String> reviewerEmails) {}
     public record EvaluateQuestionRequest(String reviewerEmail, String decision, String observation) {}
+    public record UpdateQuestionRequest(
+            String nombre,
+            String texto,
+            String contexto,
+            List<String> opciones,
+            int respuestaCorrecta,
+            String justificacion,
+            String bibliografia,
+            String competencia,
+            String tema,
+            String subtema,
+            String nivelDificultad,
+            String estado,
+            String revisorAsignado,
+            Integer autorId
+    ) {}
 
     public record CreateQuestionDTO(
             String nombre,
@@ -128,6 +144,72 @@ public class QuestionRestController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(toMap(opt.get()));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Actualizar pregunta")
+    public ResponseEntity<?> updateQuestion(
+            @PathVariable("id") int id,
+            @RequestBody UpdateQuestionRequest request
+    ) {
+        Optional<Question> opt = repository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (request.estado() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El estado es obligatorio"));
+        }
+        ValidationRequest validationRequest = new ValidationRequest(
+                request.nombre(), request.texto(), request.contexto(), request.opciones(),
+                request.respuestaCorrecta(), request.justificacion(), request.bibliografia(),
+                request.competencia(), request.tema(), request.subtema(), request.nivelDificultad()
+        );
+        ValidationResult result = validationFacade.validateQuestion(validationRequest);
+        if (!result.valid()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Validación estructural fallida",
+                    "detalles", result.errors()
+            ));
+        }
+
+        Question question = opt.get();
+        try {
+            QuestionStatus requestedStatus = QuestionStatus.valueOf(request.estado());
+            if (question.getEstado() != requestedStatus
+                    && requestedStatus == QuestionStatus.PENDIENTE_REVISION
+                    && question.getEstado() == QuestionStatus.BORRADOR) {
+                question.getStateObject().enviarARevision(question);
+            } else if (question.getEstado() != requestedStatus) {
+                question.setEstado(requestedStatus);
+            }
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El estado indicado no es válido"));
+        }
+        question.setNombre(request.nombre());
+        question.setTexto(request.texto());
+        question.setContexto(request.contexto());
+        question.setOpciones(request.opciones());
+        question.setRespuestaCorrecta(request.respuestaCorrecta());
+        question.setJustificacion(request.justificacion());
+        question.setBibliografia(request.bibliografia());
+        question.setCompetencia(request.competencia());
+        question.setTema(request.tema());
+        question.setSubtema(request.subtema());
+        question.setNivelDificultad(request.nivelDificultad());
+        question.setRevisorAsignado(request.revisorAsignado());
+        question.setAutorId(request.autorId());
+        repository.update(question);
+        return ResponseEntity.ok(toMap(question));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Eliminar pregunta")
+    public ResponseEntity<Void> deleteQuestion(@PathVariable("id") int id) {
+        if (repository.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        repository.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/enviar-revision")
