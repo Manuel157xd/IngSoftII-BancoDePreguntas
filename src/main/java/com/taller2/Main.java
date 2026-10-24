@@ -3,6 +3,7 @@ package com.taller2;
 import javax.swing.SwingUtilities;
 
 import com.taller2.persistencia.remote.MicroserviceIdentityClient;
+import com.taller2.persistencia.remote.MicroserviceNotificationClient;
 import com.taller2.persistencia.remote.MicroserviceQuestionRepository;
 import com.taller2.persistencia.remote.MicroserviceReviewClient;
 import com.taller2.persistencia.remote.RemoteServiceUrls;
@@ -13,6 +14,7 @@ import com.taller2.presentacion.swing.LoginView;
 import com.taller2.negocio.validation.PasswordValidator;
 import com.taller2.negocio.validation.QuestionValidator;
 import com.taller2.presentacion.controller.QuestionController;
+import com.taller2.presentacion.controller.NotificationController;
 import com.taller2.presentacion.controller.ReviewController;
 
 public class Main {
@@ -20,6 +22,8 @@ public class Main {
         RemoteServiceUrls serviceUrls = RemoteServiceUrls.localDefaults();
         MicroserviceIdentityClient identityClient = new MicroserviceIdentityClient(serviceUrls.identity());
         MicroserviceReviewClient reviewClient = new MicroserviceReviewClient(serviceUrls.reviews());
+        MicroserviceNotificationClient notificationClient =
+                new MicroserviceNotificationClient(serviceUrls.notifications());
 
         var usuarioRepository = identityClient;
         PasswordValidator passwordValidator = new PasswordValidator();
@@ -38,12 +42,14 @@ public class Main {
         );
         QuestionController questionController = new QuestionController(questionService);
         ReviewController reviewController = new ReviewController(reviewClient);
+        NotificationController notificationController = new NotificationController(notificationClient);
 
         SwingUtilities.invokeLater(() -> {
             LoginView loginView = new LoginView(
                     new com.taller2.presentacion.controller.UsuarioController(usuarioService),
                     questionController,
-                    reviewController
+                    reviewController,
+                    notificationController
             );
             loginView.setVisible(true);
         });

@@ -11,12 +11,14 @@ import com.taller2.negocio.model.Usuario;
 import com.taller2.negocio.service.UsuarioService;
 import com.taller2.presentacion.controller.QuestionController;
 import com.taller2.presentacion.controller.ReviewController;
+import com.taller2.presentacion.controller.NotificationController;
 
 public class DashboardView extends JFrame {
     private final Usuario usuario;
     private final UsuarioService usuarioService;
     private final QuestionController questionController;
     private final ReviewController reviewController;
+    private final NotificationController notificationController;
 
     public DashboardView(Usuario usuario, UsuarioService usuarioService,
                          QuestionController questionController) {
@@ -25,10 +27,17 @@ public class DashboardView extends JFrame {
 
     public DashboardView(Usuario usuario, UsuarioService usuarioService,
                          QuestionController questionController, ReviewController reviewController) {
+        this(usuario, usuarioService, questionController, reviewController, null);
+    }
+
+    public DashboardView(Usuario usuario, UsuarioService usuarioService,
+                         QuestionController questionController, ReviewController reviewController,
+                         NotificationController notificationController) {
         this.usuario = usuario;
         this.usuarioService = usuarioService;
         this.questionController = questionController;
         this.reviewController = reviewController;
+        this.notificationController = notificationController;
         initComponents();
     }
 
@@ -42,6 +51,12 @@ public class DashboardView extends JFrame {
         JButton preguntas = new JButton("Banco de preguntas");
         preguntas.addActionListener(e -> new PreguntasView(questionController, usuario).setVisible(true));
         panel.add(preguntas);
+        if (notificationController != null) {
+            JButton notifications = new JButton("Notificaciones");
+            notifications.addActionListener(e ->
+                    new NotificationsView(usuario, notificationController).setVisible(true));
+            panel.add(notifications);
+        }
         if (usuario.getRol() == com.taller2.negocio.model.Rol.REVISOR && reviewController != null) {
             JButton reviews = new JButton("Mis preguntas asignadas");
             reviews.addActionListener(e -> new ReviewsView(usuario, reviewController).setVisible(true));
@@ -65,7 +80,8 @@ public class DashboardView extends JFrame {
             new LoginView(
                     new com.taller2.presentacion.controller.UsuarioController(usuarioService),
                     questionController,
-                    reviewController
+                    reviewController,
+                    notificationController
             ).setVisible(true);
             dispose();
         });

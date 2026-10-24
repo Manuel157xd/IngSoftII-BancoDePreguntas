@@ -5,7 +5,7 @@ El proyecto conserva la aplicación Java Desktop de la primera iteración y agre
 
 - **Preguntas**: creación, validación, estados y persistencia en `questions.db`.
 - **Revisión**: asignaciones y evaluaciones; conserva sus datos en `reviews.db` y consulta/actualiza preguntas mediante HTTP.
-- **Notificaciones**: recibe eventos HTTP y simula el envío de correo escribiéndolo en la consola.
+- **Notificaciones**: recibe eventos HTTP, guarda avisos en `notifications.db` y los muestra en la bandeja del escritorio. También imprime en consola una simulación del correo; no envía correo real.
 - **Identidad**: autenticación y usuarios en `identity.db`.
 
 La comunicación entre Preguntas y Revisión es HTTP REST. Los eventos se envían por HTTP al servicio de Notificaciones; es una implementación didáctica para ejecutar localmente, no un broker durable ni una garantía de entrega de producción. `Main` sigue iniciando la aplicación Swing de la iteración anterior. `MicroservicesApplication` conserva el modo combinado de desarrollo; para mostrar la separación, iniciar las aplicaciones de servicio descritas abajo.
@@ -42,9 +42,11 @@ Con los cuatro servicios arriba, inicia la interfaz Swing reutilizada desde una 
 mvn '-Dspring-boot.run.arguments=--app.service=desktop' spring-boot:run
 ```
 
-La interfaz Swing ahora consume Identidad, Preguntas y Revisión por HTTP a través de `persistencia.remote`; no inicializa ni accede a la base SQLite de la aplicación monolítica. En el login puedes usar las cuentas de demostración. En el formulario de preguntas, el administrador puede asignar de uno a tres correos separados por coma. Un usuario con rol `REVISOR` verá el botón “Mis preguntas asignadas” para abrir la vista de evaluación. Las URLs se pueden cambiar con propiedades `banco.services.questions.url`, `banco.services.identity.url`, `banco.services.reviews.url` o con variables de entorno `BANCO_QUESTIONS_URL`, `BANCO_IDENTITY_URL`, `BANCO_REVIEWS_URL`.
+La interfaz Swing consume Identidad, Preguntas, Revisión y Notificaciones por HTTP a través de `persistencia.remote`; no inicializa ni accede a las bases SQLite de la aplicación monolítica. En el login puedes usar las cuentas de demostración. En el panel principal, el botón **Notificaciones** abre la bandeja del usuario: las asignaciones aparecen al revisor correspondiente y el resultado de una evaluación aparece al autor. Los avisos se conservan en `notifications.db` y se pueden marcar como leídos. Un usuario con rol `REVISOR` también verá el botón “Mis preguntas asignadas” para abrir la vista de evaluación. Las URLs se pueden cambiar con propiedades `banco.services.questions.url`, `banco.services.identity.url`, `banco.services.reviews.url`, `banco.services.notifications.url` o con variables de entorno `BANCO_QUESTIONS_URL`, `BANCO_IDENTITY_URL`, `BANCO_REVIEWS_URL`, `BANCO_NOTIFICATIONS_URL`.
 
-Para la demostración: crea una pregunta en Preguntas; envíala a revisión con `PATCH /api/questions/{id}/enviar-revision`; asígnale de 1 a 3 revisores desde Revisión con `POST /api/reviews/assign`; consulta `GET /api/reviews/assigned/{revisorEmail}` y evalúa con `POST /api/reviews/evaluate`. Las notificaciones simuladas se ven en la terminal del servicio Notificaciones. Las preguntas de ejemplo están en `questions.db`; usa una que esté en estado `PENDIENTE_REVISION` para probar la asignación.
+Esta bandeja es un mecanismo demostrativo para el entorno local: las API no validan una sesión/token antes de consultar el destinatario, así que no debe exponerse como está a una red pública.
+
+Para la demostración: crea una pregunta en Preguntas; envíala a revisión con `PATCH /api/questions/{id}/enviar-revision`; asígnale de 1 a 3 revisores desde Revisión con `POST /api/reviews/assign`; consulta `GET /api/reviews/assigned/{revisorEmail}` y evalúa con `POST /api/reviews/evaluate`. La bandeja obtiene los avisos con `GET /api/notifications/inbox?recipient=<correo-del-revisor>` para revisores o `GET /api/notifications/inbox?recipient=USER_ID:<id>` para autores; `PATCH /api/notifications/{id}/read` con `{"recipient":"..."}` marca un aviso como leído. Las notificaciones simuladas también se imprimen en la terminal del servicio Notificaciones. Las preguntas de ejemplo están en `questions.db`; usa una que esté en estado `PENDIENTE_REVISION` para probar la asignación.
 
 ## Estructura de paquetes
 
