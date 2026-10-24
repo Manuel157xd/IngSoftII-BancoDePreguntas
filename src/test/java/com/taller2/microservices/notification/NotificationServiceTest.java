@@ -5,6 +5,8 @@ import com.taller2.microservices.events.model.QuestionEvaluatedEvent;
 import com.taller2.microservices.events.model.ReviewersAssignedEvent;
 import com.taller2.microservices.events.publisher.EventEnvelope;
 import com.taller2.microservices.notification.adapter.LogEmailSenderAdapter;
+import com.taller2.microservices.notification.factory.QuestionEvaluatedNotificationFactory;
+import com.taller2.microservices.notification.factory.ReviewerAssignmentNotificationFactory;
 import com.taller2.microservices.notification.repository.NotificationRepository;
 import org.springframework.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +30,11 @@ class NotificationServiceTest {
         repository = new NotificationRepository("jdbc:sqlite:test_notifications.db");
         eventBus = new DomainEventBus();
         emailAdapter = new LogEmailSenderAdapter();
-        notificationService = new NotificationService(emailAdapter, repository);
+        notificationService = new NotificationService(
+                emailAdapter,
+                repository,
+                List.of(new ReviewerAssignmentNotificationFactory(), new QuestionEvaluatedNotificationFactory())
+        );
         eventBus.subscribe(notificationService::handleEvent);
     }
 
@@ -68,7 +74,7 @@ class NotificationServiceTest {
 
         List<LogEmailSenderAdapter.SentEmail> sent = emailAdapter.getSentEmails();
         assertEquals(1, sent.size());
-        assertEquals("autor5@unicauca.edu.co", sent.get(0).to());
+        assertEquals("USER_ID:5", sent.get(0).to());
         assertTrue(sent.get(0).subject().contains("APROBADA"));
         assertTrue(sent.get(0).body().contains("Excelente formulación"));
         assertEquals(1, repository.findByRecipient("USER_ID:5").size());

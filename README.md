@@ -132,9 +132,14 @@ Los servicios reciben abstracciones como `UsuarioRepository`, `PasswordPolicy` y
 
 La parte de microservicios incluye al menos seis patrones GoF de las tres categorías solicitadas:
 
-- **Creacionales**: Builder (`QuestionBuilder`) y Factory (`NotificationFactory`).
-- **Estructurales**: Facade (`StructuralValidationFacade`) y Adapter (`EmailSenderAdapter` / `LogEmailSenderAdapter`).
-- **De comportamiento**: State (`QuestionState`) y Observer (`DomainEventBus` en modo combinado; el modo distribuido publica eventos al servicio de notificaciones).
+| Categoría | Patrón | Uso |
+|---|---|---|
+| Creacional | Builder (`QuestionBuilder`) | Construye preguntas con sus campos DCE. |
+| Creacional | Factory Method (`NotificationFactory`) | Las fábricas concretas crean mensajes para asignaciones y evaluaciones. |
+| Estructural | Facade (`StructuralValidationFacade`) | Expone la validación estructural DCE como una operación para el controlador de preguntas. |
+| Estructural | Adapter (`EmailSenderAdapter` / `LogEmailSenderAdapter`) | Adapta la salida de notificaciones a la simulación por consola, sin depender de un proveedor de correo. |
+| Comportamiento | State (`QuestionState`) | Encapsula transiciones y reglas del ciclo de vida de las preguntas. |
+| Comportamiento | Observer (`DomainEventBus`) | En el modo combinado, los suscriptores reciben eventos de dominio; en modo distribuido se publican por HTTP. |
 
 ### Strategy
 - `PasswordHasher` y `QuestionPolicy` permiten variar hashing y validación sin cambiar los servicios.
@@ -151,4 +156,4 @@ La parte de microservicios incluye al menos seis patrones GoF de las tres catego
 - Posible extensión de nuevas funcionalidades.
 - Mejor testabilidad por capas.
 
-Todos los paquetes Java usan el espacio de nombres `com.taller2`. La interfaz Swing se ejecuta como un proceso de escritorio separado y accede a los servicios por HTTP; la demo REST muestra los contextos de servicio en procesos separados y mantiene bases SQLite separadas para preguntas, revisiones e identidad.
+Todos los paquetes Java usan el espacio de nombres `com.taller2`. La interfaz Swing se ejecuta como un proceso de escritorio separado y accede a los servicios por HTTP; la demo REST muestra los contextos de servicio en procesos separados y mantiene bases SQLite separadas para preguntas, revisiones, identidad y notificaciones.

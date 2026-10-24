@@ -9,34 +9,38 @@ import com.taller2.microservices.notification.factory.NotificationFactory;
 import com.taller2.microservices.notification.repository.NotificationRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class NotificationService {
 
     private final EmailSenderAdapter emailSender;
     private final NotificationRepository repository;
+    private final List<NotificationFactory> notificationFactories;
 
-    public NotificationService(EmailSenderAdapter emailSender, NotificationRepository repository) {
+    public NotificationService(
+            EmailSenderAdapter emailSender,
+            NotificationRepository repository,
+            List<NotificationFactory> notificationFactories
+    ) {
         this.emailSender = emailSender;
         this.repository = repository;
+        this.notificationFactories = List.copyOf(notificationFactories);
     }
 
     public void handleEvent(DomainEvent event) {
         if (event instanceof ReviewersAssignedEvent assignedEvent) {
             validateReviewerEmails(assignedEvent.getReviewerEmails());
             for (String email : assignedEvent.getReviewerEmails()) {
-                NotificationFactory.NotificationMessage message =
-                        NotificationFactory.createForReviewersAssigned(assignedEvent, email);
-                notifyRecipient(event.getEventId(), normalizeEmail(message.recipient()), message);
+                String recipient = normalizeEmail(email);
+                notifyRecipient(event.getEventId(), recipient, createMessage(assignedEvent, recipient));
             }
         } else if (event instanceof QuestionEvaluatedEvent evaluatedEvent) {
             if (evaluatedEvent.getAuthorId() == null) {
                 return;
             }
             String recipient = userRecipient(evaluatedEvent.getAuthorId());
-            String authorEmail = "autor" + evaluatedEvent.getAuthorId() + "@unicauca.edu.co";
-            NotificationFactory.NotificationMessage message =
-                    NotificationFactory.createForQuestionEvaluated(evaluatedEvent, authorEmail);
-            notifyRecipient(event.getEventId(), recipient, message);
+            notifyRecipient(event.getEventId(), recipient, createMessage(evaluatedEvent, recipient));
         }
     }
 
@@ -48,9 +52,8 @@ public class NotificationService {
                 );
                 validateReviewerEmails(event.getReviewerEmails());
                 for (String email : event.getReviewerEmails()) {
-                    NotificationFactory.NotificationMessage message =
-                            NotificationFactory.createForReviewersAssigned(event, email);
-                    notifyRecipient(envelope.eventId(), normalizeEmail(email), message);
+                    String recipient = normalizeEmail(email);
+                    notifyRecipient(envelope.eventId(), recipient, createMessage(event, recipient));
                 }
             }
             case "QUESTION_EVALUATED" -> {
@@ -58,14 +61,11 @@ public class NotificationService {
                     return;
                 }
                 String recipient = userRecipient(envelope.authorId());
-                String authorEmail = "autor" + envelope.authorId() + "@unicauca.edu.co";
                 QuestionEvaluatedEvent event = new QuestionEvaluatedEvent(
                         envelope.questionId(), envelope.questionName(), envelope.reviewerEmail(),
                         envelope.outcome(), envelope.observation(), envelope.authorId()
                 );
-                NotificationFactory.NotificationMessage message =
-                        NotificationFactory.createForQuestionEvaluated(event, authorEmail);
-                notifyRecipient(envelope.eventId(), recipient, message);
+                notifyRecipient(envelope.eventId(), recipient, createMessage(event, recipient));
             }
             case "QUESTION_SUBMITTED_FOR_REVIEW" -> {
                 // This event is available for future notification workflows.
@@ -82,8 +82,18 @@ public class NotificationService {
             NotificationFactory.NotificationMessage message
     ) {
         if (repository.save(eventId, recipient, message.subject(), message.body())) {
-            emailSender.sendEmail(message.recipient(), message.subject(), message.body());
+            emailSender.sendEmail(recipient, message.subject(), message.body());
         }
+    }
+
+    private NotificationFactory.NotificationMessage createMessage(DomainEvent event, String recipient) {
+        return notificationFactories.stream()
+                .filter(factory -> factory.supports(event))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No hay una fábrica de notificaciones para el evento " + event.getEventType()
+                ))
+                .create(event, recipient);
     }
 
     public static String userRecipient(int userId) {
