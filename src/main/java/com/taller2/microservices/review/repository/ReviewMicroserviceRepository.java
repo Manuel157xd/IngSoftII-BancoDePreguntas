@@ -57,16 +57,27 @@ public class ReviewMicroserviceRepository {
     ) {}
 
     public void createAssignment(int preguntaId, String revisorEmail) {
-        String sql = """
+        String checkSql = "SELECT COUNT(*) FROM asignaciones_revision WHERE pregunta_id = ? AND LOWER(revisor_email) = LOWER(?)";
+        String insertSql = """
             INSERT INTO asignaciones_revision (pregunta_id, revisor_email, fecha_asignacion, estado)
             VALUES (?, ?, ?, 'PENDIENTE')
         """;
-        try (Connection conn = DriverManager.getConnection(dbUrl);
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, preguntaId);
-            ps.setString(2, revisorEmail);
-            ps.setString(3, LocalDateTime.now().toString());
-            ps.executeUpdate();
+        try (Connection conn = DriverManager.getConnection(dbUrl)) {
+            try (PreparedStatement checkPs = conn.prepareStatement(checkSql)) {
+                checkPs.setInt(1, preguntaId);
+                checkPs.setString(2, revisorEmail.trim());
+                try (ResultSet rs = checkPs.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        return; // Ya se encuentra asignado previamente
+                    }
+                }
+            }
+            try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
+                ps.setInt(1, preguntaId);
+                ps.setString(2, revisorEmail.trim());
+                ps.setString(3, LocalDateTime.now().toString());
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Error asignando revisor: " + e.getMessage(), e);
         }

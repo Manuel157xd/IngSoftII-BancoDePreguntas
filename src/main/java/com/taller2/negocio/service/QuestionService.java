@@ -138,6 +138,10 @@ public class QuestionService {
         Question persisted = repository.buscarPorId(question.getId())
                 .orElseThrow(() -> new IllegalArgumentException("La pregunta ya no existe."));
         validarPropiedad(persisted, actor);
+        if (actor.getRol() == Rol.AUTOR_PREGUNTAS && !persisted.getStateObject().permiteEdicion()) {
+            throw new IllegalStateException("La pregunta en estado '" + persisted.getStateObject().getNombre()
+                    + "' no permite modificaciones por parte del autor.");
+        }
         question.setAutorId(persisted.getAutorId());
         repository.actualizar(question);
         if (persisted.getEstado() != question.getEstado()) {

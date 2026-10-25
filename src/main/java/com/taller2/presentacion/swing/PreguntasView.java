@@ -56,6 +56,8 @@ public class PreguntasView extends JFrame {
     
     private final JComboBox<QuestionStatus> status = new JComboBox<>(QuestionStatus.values());
     private final JTextField reviewerEmail = new JTextField();
+    private final JButton save = new JButton("Guardar / Validar");
+    private final JButton sendToReview = new JButton("Enviar a Revisión (HU2)");
     
     // Paginación y Filtros
     private int currentPage = 0;
@@ -133,8 +135,8 @@ public class PreguntasView extends JFrame {
         }
 
         // Botones de acción
-        JButton save = new JButton("Guardar / Validar");
         save.addActionListener(e -> guardar());
+        sendToReview.addActionListener(e -> enviarARevision());
 
         JButton updateState = new JButton("Actualizar Estado");
         updateState.addActionListener(e -> actualizarEstado());
@@ -146,6 +148,9 @@ public class PreguntasView extends JFrame {
             buttons.add(assignReviewer);
         }
         buttons.add(save);
+        if (usuario.getRol() == Rol.AUTOR_PREGUNTAS) {
+            buttons.add(sendToReview);
+        }
         buttons.add(updateState);
 
         GridBagConstraints bc = new GridBagConstraints();
@@ -302,6 +307,10 @@ public class PreguntasView extends JFrame {
         justification.setText(question.getJustificacion() != null ? question.getJustificacion() : "");
         bibliography.setText(question.getBibliografia() != null ? question.getBibliografia() : "");
         reviewerEmail.setText(question.getRevisorAsignado() != null ? question.getRevisorAsignado() : "");
+
+        boolean editable = usuario.getRol() != Rol.AUTOR_PREGUNTAS || question.getStateObject().permiteEdicion();
+        save.setEnabled(editable);
+        save.setToolTipText(editable ? null : "La pregunta en estado '" + question.getStateObject().getNombre() + "' no permite modificaciones.");
     }
 
     private void limpiarFormulario() {
@@ -314,6 +323,8 @@ public class PreguntasView extends JFrame {
         if (status.getItemCount() > 0) {
             status.setSelectedItem(QuestionStatus.BORRADOR);
         }
+        save.setEnabled(true);
+        save.setToolTipText(null);
     }
 
     private void actualizarOpcionesCorrectas(int size, int selected) {
@@ -386,6 +397,31 @@ public class PreguntasView extends JFrame {
             JOptionPane.showMessageDialog(this, "Estado actualizado exitosamente.");
         } catch (RuntimeException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(), "No se pudo actualizar",
+                    JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private void enviarARevision() {
+        Question question = (Question) questions.getSelectedItem();
+        if (question == null) {
+            JOptionPane.showMessageDialog(this, "Selecciona una pregunta para enviar a revisión.",
+                    "Aviso", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        if (question.getEstado() != QuestionStatus.BORRADOR && question.getEstado() != QuestionStatus.RECHAZADA) {
+            JOptionPane.showMessageDialog(this,
+                    "Solo se pueden enviar a revisión preguntas en estado 'Borrador' o 'Rechazada'.\nEstado actual: " + question.getEstado(),
+                    "Transición no permitida", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        try {
+            controller.cambiarEstado(usuario, question, QuestionStatus.PENDIENTE_REVISION);
+            cargarPreguntas();
+            JOptionPane.showMessageDialog(this,
+                    "¡Pregunta enviada a revisión exitosamente! (HU2)\nEstado: Pendiente de revisión.\nAhora el administrador podrá asignarle revisores.",
+                    "Transición de Estado Exitosa", JOptionPane.INFORMATION_MESSAGE);
+        } catch (RuntimeException exception) {
+            JOptionPane.showMessageDialog(this, exception.getMessage(), "Error al enviar a revisión",
                     JOptionPane.WARNING_MESSAGE);
         }
     }

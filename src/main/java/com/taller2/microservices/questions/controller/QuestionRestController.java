@@ -173,6 +173,13 @@ public class QuestionRestController {
         }
 
         Question question = opt.get();
+        if (request.autorId() != null && !question.getStateObject().permiteEdicion()
+                && question.getEstado() != QuestionStatus.BORRADOR && question.getEstado() != QuestionStatus.RECHAZADA) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "La pregunta en estado '" + question.getStateObject().getNombre()
+                            + "' no permite modificaciones por parte del autor."
+            ));
+        }
         try {
             QuestionStatus requestedStatus = QuestionStatus.valueOf(request.estado());
             if (question.getEstado() != requestedStatus

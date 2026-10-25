@@ -34,6 +34,7 @@ Inicia primero Notificaciones y Preguntas, después Revisión e Identidad. La do
 
 - Preguntas: `http://localhost:8081/swagger-ui/index.html`
 - Revisión: `http://localhost:8082/swagger-ui/index.html`
+- Notificaciones: `http://localhost:8083/swagger-ui/index.html`
 - Identidad: `http://localhost:8084/swagger-ui/index.html`
 
 Con los cuatro servicios arriba, inicia la interfaz Swing reutilizada desde una quinta terminal:

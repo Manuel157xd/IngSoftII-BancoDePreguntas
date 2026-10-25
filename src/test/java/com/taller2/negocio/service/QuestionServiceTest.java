@@ -44,6 +44,19 @@ class QuestionServiceTest {
     }
 
     @Test
+    void debeImpedirQueUnAutorModifiqueUnaPreguntaCuandoElEstadoNoPermiteEdicion() {
+        MemoryRepository repository = new MemoryRepository();
+        Question pendingQuestion = pregunta(5, 10, "Pregunta en revisión");
+        pendingQuestion.setEstado(QuestionStatus.PENDIENTE_REVISION);
+        repository.guardar(pendingQuestion);
+        QuestionService service = new QuestionService(repository, new QuestionValidator());
+
+        // El patrón State bloquea la edición (permiteEdicion() == false)
+        assertThrows(IllegalStateException.class,
+                () -> service.actualizar(pendingQuestion, usuario(10, Rol.AUTOR_PREGUNTAS)));
+    }
+
+    @Test
     void debeListarSoloPreguntasDelAutorYAplicarFiltroYPaginacion() {
         MemoryRepository repository = new MemoryRepository();
         Question first = pregunta(1, 10, "Álgebra básica");

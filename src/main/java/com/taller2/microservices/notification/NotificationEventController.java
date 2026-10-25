@@ -2,7 +2,10 @@ package com.taller2.microservices.notification;
 
 import com.taller2.microservices.events.publisher.EventEnvelope;
 import com.taller2.microservices.notification.repository.NotificationRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +19,8 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notifications")
+@Tag(name = "Contexto: Notificaciones", description = "Microservicio para recepción de eventos de dominio y gestión de la bandeja de entrada")
+@CrossOrigin(origins = "*")
 public class NotificationEventController {
 
     private final NotificationService notificationService;
@@ -32,6 +37,7 @@ public class NotificationEventController {
     public record ReadNotificationRequest(String recipient) {}
 
     @PostMapping("/events")
+    @Operation(summary = "Procesar evento de dominio", description = "Recibe eventos distribuidos (asignación de revisores, evaluación) y genera notificaciones en la bandeja y aviso simulado.")
     public ResponseEntity<?> receiveEvent(@RequestBody EventEnvelope envelope) {
         if (envelope == null || envelope.eventId() == null || envelope.eventId().isBlank()
                 || envelope.eventType() == null || envelope.eventType().isBlank()) {
@@ -49,6 +55,7 @@ public class NotificationEventController {
     }
 
     @GetMapping("/inbox")
+    @Operation(summary = "Consultar bandeja de entrada", description = "Lista las notificaciones recibidas por destinatario (correo de revisor o USER_ID:<id>).")
     public ResponseEntity<?> getInbox(@RequestParam String recipient) {
         if (recipient == null || recipient.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "El destinatario es obligatorio"));
@@ -57,6 +64,7 @@ public class NotificationEventController {
     }
 
     @PatchMapping("/{id}/read")
+    @Operation(summary = "Marcar notificación como leída", description = "Actualiza el estado de lectura de una notificación para el destinatario indicado.")
     public ResponseEntity<?> markRead(
             @PathVariable int id,
             @RequestBody ReadNotificationRequest request

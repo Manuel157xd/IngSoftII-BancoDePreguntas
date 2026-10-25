@@ -42,10 +42,22 @@ public class ReviewRestController {
     @PostMapping("/assign")
     @Operation(summary = "Asignar revisores (HU4)", description = "Asigna entre 1 y 3 revisores y envía un evento HTTP al servicio de notificaciones.")
     public ResponseEntity<?> assignReviewers(@RequestBody AssignReviewersDTO dto) {
-        if (dto.revisoresEmails() == null || dto.revisoresEmails().isEmpty()
-                || dto.revisoresEmails().size() > 3) {
+        if (dto.revisoresEmails() == null || dto.revisoresEmails().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "La regla de negocio exige asignar entre 1 y 3 revisores"
+            ));
+        }
+
+        List<String> reviewerEmails = dto.revisoresEmails().stream()
+                .filter(email -> email != null && !email.trim().isBlank())
+                .map(email -> email.trim().toLowerCase(Locale.ROOT))
+                .distinct()
+                .toList();
+
+        if (reviewerEmails.isEmpty() || reviewerEmails.size() > 3
+                || reviewerEmails.stream().anyMatch(email -> !email.contains("@"))) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "La regla de negocio exige asignar entre 1 y 3 correos de revisor válidos y únicos"
             ));
         }
 
@@ -61,9 +73,6 @@ public class ReviewRestController {
             ));
         }
 
-        List<String> reviewerEmails = dto.revisoresEmails().stream()
-                .map(String::trim)
-                .toList();
         QuestionSnapshot updatedQuestion;
         try {
             updatedQuestion = questionService.assignReviewers(question.id(), reviewerEmails);
